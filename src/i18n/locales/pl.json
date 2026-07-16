@@ -782,6 +782,14 @@
       "preserveTimestamps": "Ustaw datę modyfikacji pliku na podstawie daty wykonania (EXIF)",
       "title": "Ustawienia eksportu"
     },
+    "border": {
+      "addBorder": "Dodaj ramkę",
+      "aspectRatio": "Proporcje",
+      "color": "Kolor",
+      "cornerRadius": "Promień zaokrąglenia rogów",
+      "originalRatio": "Oryginalny",
+      "width": "Szerokość"
+    },
     "bytes": {
       "bytes": "Bajty",
       "gb": "GB",
@@ -824,6 +832,7 @@
     },
     "sections": {
       "advanced": "Zaawansowane",
+      "border": "Ramka",
       "fileNaming": "Nazewnictwo plików",
       "fileSettings": "Ustawienia pliku",
       "imageSizing": "Rozmiar obrazu",

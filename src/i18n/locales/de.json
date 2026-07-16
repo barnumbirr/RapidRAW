@@ -740,6 +740,14 @@
       "preserveTimestamps": "Dateizeitstempel aus EXIF-Aufnahmedatum setzen",
       "title": "Exporteinstellungen"
     },
+    "border": {
+      "addBorder": "Rahmen hinzufügen",
+      "aspectRatio": "Seitenverhältnis",
+      "color": "Farbe",
+      "cornerRadius": "Eckenradius",
+      "originalRatio": "Original",
+      "width": "Breite"
+    },
     "bytes": {
       "bytes": "Bytes",
       "gb": "GB",
@@ -780,6 +788,7 @@
     },
     "sections": {
       "advanced": "Erweitert",
+      "border": "Rahmen",
       "fileNaming": "Dateibenennung",
       "fileSettings": "Dateieinstellungen",
       "imageSizing": "Bildgröße",

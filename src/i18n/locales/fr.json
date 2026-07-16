@@ -761,6 +761,14 @@
       "preserveTimestamps": "Définir l'horodatage des fichiers à partir de la date de prise de vue EXIF",
       "title": "Paramètres d'exportation"
     },
+    "border": {
+      "addBorder": "Ajouter une bordure",
+      "aspectRatio": "Rapport d'aspect",
+      "color": "Couleur",
+      "cornerRadius": "Rayon de bordure",
+      "originalRatio": "Original",
+      "width": "Largeur"
+    },
     "bytes": {
       "bytes": "Octets",
       "gb": "Go",
@@ -802,6 +810,7 @@
     },
     "sections": {
       "advanced": "Avancé",
+      "border": "Bordure",
       "fileNaming": "Nommage des fichiers",
       "fileSettings": "Paramètres du fichier",
       "imageSizing": "Taille de l'image",

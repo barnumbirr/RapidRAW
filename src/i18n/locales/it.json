@@ -761,6 +761,14 @@
       "preserveTimestamps": "Imposta Timestamp File dalla Data di Acquisizione EXIF",
       "title": "Impostazioni di Esportazione"
     },
+    "border": {
+      "addBorder": "Aggiungi Bordo",
+      "aspectRatio": "Proporzioni",
+      "color": "Colore",
+      "cornerRadius": "Raggio del Bordo",
+      "originalRatio": "Originale",
+      "width": "Larghezza"
+    },
     "bytes": {
       "bytes": "Byte",
       "gb": "GB",
@@ -802,6 +810,7 @@
     },
     "sections": {
       "advanced": "Avanzate",
+      "border": "Bordo",
       "fileNaming": "Nomenclatura File",
       "fileSettings": "Impostazioni File",
       "imageSizing": "Dimensionamento Immagine",

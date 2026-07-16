@@ -740,6 +740,14 @@
       "preserveTimestamps": "Set File Timestamps from EXIF Capture Date",
       "title": "Export Settings"
     },
+    "border": {
+      "addBorder": "Add Border",
+      "aspectRatio": "Aspect Ratio",
+      "color": "Color",
+      "cornerRadius": "Border Radius",
+      "originalRatio": "Original",
+      "width": "Width"
+    },
     "bytes": {
       "bytes": "Bytes",
       "gb": "GB",
@@ -780,6 +788,7 @@
     },
     "sections": {
       "advanced": "Advanced",
+      "border": "Border",
       "fileNaming": "File Naming",
       "fileSettings": "File Settings",
       "imageSizing": "Image Sizing",

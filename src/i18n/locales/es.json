@@ -761,6 +761,14 @@
       "preserveTimestamps": "Establecer marcas de tiempo del archivo desde la fecha de captura EXIF",
       "title": "Ajustes de exportación"
     },
+    "border": {
+      "addBorder": "Añadir borde",
+      "aspectRatio": "Relación de aspecto",
+      "color": "Color",
+      "cornerRadius": "Radio del borde",
+      "originalRatio": "Original",
+      "width": "Anchura"
+    },
     "bytes": {
       "bytes": "Bytes",
       "gb": "GB",
@@ -802,6 +810,7 @@
     },
     "sections": {
       "advanced": "Avanzado",
+      "border": "Borde",
       "fileNaming": "Nomenclatura de archivos",
       "fileSettings": "Ajustes de archivo",
       "imageSizing": "Tamaño de imagen",

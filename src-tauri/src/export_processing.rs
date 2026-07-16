@@ -7,7 +7,10 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, imageops};
+use image::{
+    DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgb, Rgb32FImage,
+    RgbImage, imageops,
+};
 use jxl_encoder::{
     LosslessConfig, LossyConfig, PixelLayout,
     api::{calibrated_jxl_quality, quality_to_distance},
@@ -71,6 +74,8 @@ pub struct ExportSettings {
     pub filename_template: Option<String>,
     pub watermark: Option<WatermarkSettings>,
     #[serde(default)]
+    pub border: Option<BorderSettings>,
+    #[serde(default)]
     pub export_masks: bool,
     #[serde(default)]
     pub preserve_folders: bool,
@@ -98,6 +103,15 @@ pub struct WatermarkSettings {
     pub scale: f32,
     pub spacing: f32,
     pub opacity: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BorderSettings {
+    pub width: f32,
+    pub color: String,
+    pub corner_radius: f32,
+    pub aspect_ratio: Option<f32>,
 }
 
 fn apply_watermark(
@@ -159,6 +173,135 @@ fn apply_watermark(
     image::imageops::overlay(base_image, &final_watermark, x, y);
 
     Ok(())
+}
+
+fn parse_hex_color(hex: &str) -> Option<[u8; 3]> {
+    let hex = hex.trim().trim_start_matches('#');
+    if !hex.is_ascii() {
+        return None;
+    }
+    match hex.len() {
+        6 => Some([
+            u8::from_str_radix(&hex[0..2], 16).ok()?,
+            u8::from_str_radix(&hex[2..4], 16).ok()?,
+            u8::from_str_radix(&hex[4..6], 16).ok()?,
+        ]),
+        3 => {
+            let component = |i: usize| u8::from_str_radix(&hex[i..i + 1], 16).ok().map(|v| v * 17);
+            Some([component(0)?, component(1)?, component(2)?])
+        }
+        _ => None,
+    }
+}
+
+fn border_width_pixels(width: u32, height: u32, border: &BorderSettings) -> u32 {
+    let long_edge = width.max(height) as f32;
+    (long_edge * (border.width.clamp(0.0, 100.0) / 100.0)).round() as u32
+}
+
+fn corner_radius_pixels(width: u32, height: u32, border: &BorderSettings) -> f32 {
+    let short_edge = width.min(height) as f32;
+    short_edge * (border.corner_radius.clamp(0.0, 50.0) / 100.0)
+}
+
+fn bordered_dimensions(width: u32, height: u32, border: &BorderSettings) -> (u32, u32) {
+    let border_px = border_width_pixels(width, height, border);
+    let mut canvas_w = width + 2 * border_px;
+    let mut canvas_h = height + 2 * border_px;
+    if let Some(ratio) = border.aspect_ratio.filter(|r| *r > 0.0) {
+        // Only ever grow the canvas towards the target ratio so the image is never cropped.
+        let current = canvas_w as f32 / canvas_h as f32;
+        if current < ratio {
+            canvas_w = (canvas_h as f32 * ratio).round() as u32;
+        } else if current > ratio {
+            canvas_h = (canvas_w as f32 / ratio).round() as u32;
+        }
+    }
+    (canvas_w, canvas_h)
+}
+
+/// Calls `f(x, y, coverage)` for every pixel in the four corner squares whose
+/// coverage by the rounded rectangle is below 1.0.
+fn for_each_corner_pixel(width: u32, height: u32, radius: f32, mut f: impl FnMut(u32, u32, f32)) {
+    let r_ceil = (radius.ceil() as u32).min(width / 2).min(height / 2);
+    if r_ceil == 0 {
+        return;
+    }
+    let corners = [
+        (0, 0, radius, radius),
+        (width - r_ceil, 0, width as f32 - radius, radius),
+        (0, height - r_ceil, radius, height as f32 - radius),
+        (
+            width - r_ceil,
+            height - r_ceil,
+            width as f32 - radius,
+            height as f32 - radius,
+        ),
+    ];
+    for (origin_x, origin_y, center_x, center_y) in corners {
+        for y in origin_y..origin_y + r_ceil {
+            for x in origin_x..origin_x + r_ceil {
+                let dx = x as f32 + 0.5 - center_x;
+                let dy = y as f32 + 0.5 - center_y;
+                let coverage = (radius + 0.5 - (dx * dx + dy * dy).sqrt()).clamp(0.0, 1.0);
+                if coverage < 1.0 {
+                    f(x, y, coverage);
+                }
+            }
+        }
+    }
+}
+
+fn apply_border(image: DynamicImage, border: &BorderSettings) -> Result<DynamicImage, String> {
+    let [red, green, blue] = parse_hex_color(&border.color)
+        .ok_or_else(|| format!("Invalid border color: '{}'", border.color))?;
+
+    let (img_w, img_h) = image.dimensions();
+    if img_w == 0 || img_h == 0 {
+        return Ok(image);
+    }
+    let (canvas_w, canvas_h) = bordered_dimensions(img_w, img_h, border);
+    let radius = corner_radius_pixels(img_w, img_h, border);
+    if canvas_w == img_w && canvas_h == img_h && radius < 1.0 {
+        return Ok(image);
+    }
+    let offset_x = (canvas_w - img_w) / 2;
+    let offset_y = (canvas_h - img_h) / 2;
+
+    // The GPU pipeline hands us Rgb32F images; composite in f32 to preserve
+    // bit depth for PNG/TIFF exports. Anything else goes through the u8 path.
+    if image.as_rgb32f().is_some() {
+        let color = Rgb([
+            red as f32 / 255.0,
+            green as f32 / 255.0,
+            blue as f32 / 255.0,
+        ]);
+        let source = image.into_rgb32f();
+        let mut canvas = Rgb32FImage::from_pixel(canvas_w, canvas_h, color);
+        imageops::replace(&mut canvas, &source, offset_x as i64, offset_y as i64);
+        for_each_corner_pixel(img_w, img_h, radius, |x, y, coverage| {
+            let src_pixel = source.get_pixel(x, y);
+            let out = canvas.get_pixel_mut(offset_x + x, offset_y + y);
+            for c in 0..3 {
+                out.0[c] = color.0[c] + (src_pixel.0[c] - color.0[c]) * coverage;
+            }
+        });
+        Ok(DynamicImage::ImageRgb32F(canvas))
+    } else {
+        let color = Rgb([red, green, blue]);
+        let source = image.into_rgb8();
+        let mut canvas = RgbImage::from_pixel(canvas_w, canvas_h, color);
+        imageops::replace(&mut canvas, &source, offset_x as i64, offset_y as i64);
+        for_each_corner_pixel(img_w, img_h, radius, |x, y, coverage| {
+            let src_pixel = source.get_pixel(x, y);
+            let out = canvas.get_pixel_mut(offset_x + x, offset_y + y);
+            for c in 0..3 {
+                let base = color.0[c] as f32;
+                out.0[c] = (base + (src_pixel.0[c] as f32 - base) * coverage).round() as u8;
+            }
+        });
+        Ok(DynamicImage::ImageRgb8(canvas))
+    }
 }
 
 fn calculate_resize_target(
@@ -257,7 +400,7 @@ fn relative_export_dir_for_preserved_folders(
         })
 }
 
-fn apply_export_resize_and_watermark(
+fn apply_export_post_processing(
     mut image: DynamicImage,
     export_settings: &ExportSettings,
 ) -> Result<DynamicImage, String> {
@@ -272,6 +415,10 @@ fn apply_export_resize_and_watermark(
 
     if let Some(watermark_settings) = &export_settings.watermark {
         apply_watermark(&mut image, watermark_settings)?;
+    }
+
+    if let Some(border_settings) = &export_settings.border {
+        image = apply_border(image, border_settings)?;
     }
     Ok(image)
 }
@@ -542,7 +689,7 @@ fn process_image_for_export(
         app_handle,
     )?;
 
-    apply_export_resize_and_watermark(processed_image, export_settings)
+    apply_export_post_processing(processed_image, export_settings)
 }
 
 fn build_single_mask_adjustments(all: &AllAdjustments, mask_index: usize) -> AllAdjustments {
@@ -730,7 +877,7 @@ fn export_masks_for_image(
             )?;
             ensure_export_not_cancelled(cancellation_token)?;
 
-            let with_options = apply_export_resize_and_watermark(processed, export_settings)?;
+            let with_options = apply_export_post_processing(processed, export_settings)?;
             let (out_w, out_h) = with_options.dimensions();
 
             let alpha_resized = imageops::resize(
@@ -1498,6 +1645,10 @@ pub async fn estimate_export_sizes(
         } else {
             (full_w, full_h)
         };
+        let (final_full_w, final_full_h) = match &export_settings.border {
+            Some(border) => bordered_dimensions(final_full_w, final_full_h, border),
+            None => (final_full_w, final_full_h),
+        };
 
         let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
         let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
@@ -1635,6 +1786,10 @@ pub async fn estimate_export_sizes(
         } else {
             (full_w, full_h)
         };
+        let (final_full_w, final_full_h) = match &export_settings.border {
+            Some(border) => bordered_dimensions(final_full_w, final_full_h, border),
+            None => (final_full_w, final_full_h),
+        };
 
         let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
         let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
@@ -1648,4 +1803,110 @@ pub async fn estimate_export_sizes(
     };
 
     Ok(single_image_extrapolated_size * paths.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn border(width: f32, corner_radius: f32, aspect_ratio: Option<f32>) -> BorderSettings {
+        BorderSettings {
+            width,
+            color: "#FFFFFF".to_string(),
+            corner_radius,
+            aspect_ratio,
+        }
+    }
+
+    #[test]
+    fn parse_hex_color_accepts_six_and_three_digit_forms() {
+        assert_eq!(parse_hex_color("#FFFFFF"), Some([255, 255, 255]));
+        assert_eq!(parse_hex_color("#1a2b3c"), Some([26, 43, 60]));
+        assert_eq!(parse_hex_color("1a2b3c"), Some([26, 43, 60]));
+        assert_eq!(parse_hex_color("#fff"), Some([255, 255, 255]));
+        assert_eq!(parse_hex_color(" #000000 "), Some([0, 0, 0]));
+    }
+
+    #[test]
+    fn parse_hex_color_rejects_malformed_input() {
+        assert_eq!(parse_hex_color(""), None);
+        assert_eq!(parse_hex_color("#12345"), None);
+        assert_eq!(parse_hex_color("#gggggg"), None);
+        assert_eq!(parse_hex_color("#éééééé"), None);
+    }
+
+    #[test]
+    fn bordered_dimensions_adds_border_on_all_sides() {
+        // 3% of the 2000px long edge = 60px per side.
+        assert_eq!(
+            bordered_dimensions(2000, 1000, &border(3.0, 0.0, None)),
+            (2120, 1120)
+        );
+        assert_eq!(
+            bordered_dimensions(2000, 1000, &border(0.0, 0.0, None)),
+            (2000, 1000)
+        );
+    }
+
+    #[test]
+    fn bordered_dimensions_pads_to_target_ratio_without_cropping() {
+        // Landscape image padded to a square canvas: height grows to match width.
+        let (w, h) = bordered_dimensions(2000, 1000, &border(0.0, 0.0, Some(1.0)));
+        assert_eq!((w, h), (2000, 2000));
+        // Portrait target on a landscape image: the canvas only ever grows.
+        let (w, h) = bordered_dimensions(2000, 1000, &border(0.0, 0.0, Some(4.0 / 5.0)));
+        assert!(w >= 2000 && h >= 1000);
+        assert!((w as f32 / h as f32 - 0.8).abs() < 0.01);
+    }
+
+    #[test]
+    fn apply_border_wraps_image_in_solid_color() {
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(100, 50, Rgb([10, 20, 30])));
+        let result = apply_border(image, &border(10.0, 0.0, None)).unwrap();
+        // 10% of the 100px long edge = 10px per side.
+        assert_eq!(result.dimensions(), (120, 70));
+        let rgb = result.to_rgb8();
+        assert_eq!(rgb.get_pixel(0, 0), &Rgb([255, 255, 255]));
+        assert_eq!(rgb.get_pixel(60, 35), &Rgb([10, 20, 30]));
+        assert_eq!(rgb.get_pixel(10, 10), &Rgb([10, 20, 30]));
+    }
+
+    #[test]
+    fn apply_border_preserves_f32_pipeline_images() {
+        let image =
+            DynamicImage::ImageRgb32F(Rgb32FImage::from_pixel(100, 50, Rgb([0.5, 0.5, 0.5])));
+        let result = apply_border(image, &border(10.0, 0.0, None)).unwrap();
+        assert!(matches!(result, DynamicImage::ImageRgb32F(_)));
+        assert_eq!(result.dimensions(), (120, 70));
+    }
+
+    #[test]
+    fn apply_border_rounds_corners_with_border_color() {
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(100, 100, Rgb([0, 0, 0])));
+        let result = apply_border(image, &border(10.0, 20.0, None)).unwrap();
+        let rgb = result.to_rgb8();
+        // The image's corner pixel (offset 10,10) sits outside the rounded
+        // rectangle (radius 20px) and must be filled with the border color.
+        assert_eq!(rgb.get_pixel(10, 10), &Rgb([255, 255, 255]));
+        // The image center and edge midpoints are untouched.
+        assert_eq!(rgb.get_pixel(60, 60), &Rgb([0, 0, 0]));
+        assert_eq!(rgb.get_pixel(60, 10), &Rgb([0, 0, 0]));
+    }
+
+    #[test]
+    fn apply_border_rejects_invalid_color() {
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(10, 10, Rgb([0, 0, 0])));
+        assert!(
+            apply_border(
+                image,
+                &BorderSettings {
+                    width: 5.0,
+                    color: "not-a-color".to_string(),
+                    corner_radius: 0.0,
+                    aspect_ratio: None,
+                }
+            )
+            .is_err()
+        );
+    }
 }

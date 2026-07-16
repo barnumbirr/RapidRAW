@@ -738,6 +738,14 @@
       "preserveTimestamps": "EXIFの撮影日時からファイルタイムスタンプを設定",
       "title": "書き出し設定"
     },
+    "border": {
+      "addBorder": "枠を追加",
+      "aspectRatio": "アスペクト比",
+      "color": "色",
+      "cornerRadius": "角丸",
+      "originalRatio": "オリジナル",
+      "width": "幅"
+    },
     "bytes": {
       "bytes": "バイト",
       "gb": "GB",
@@ -778,6 +786,7 @@
     },
     "sections": {
       "advanced": "詳細設定",
+      "border": "枠",
       "fileNaming": "ファイル名の命名",
       "fileSettings": "ファイル設定",
       "imageSizing": "画像サイズ",

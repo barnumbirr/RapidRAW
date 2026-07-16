@@ -738,6 +738,14 @@
       "preserveTimestamps": "將檔案時間戳設為 EXIF 拍攝日期",
       "title": "匯出設定"
     },
+    "border": {
+      "addBorder": "新增邊框",
+      "aspectRatio": "寬高比",
+      "color": "顏色",
+      "cornerRadius": "邊框圓角",
+      "originalRatio": "原始",
+      "width": "寬度"
+    },
     "bytes": {
       "bytes": "位元組",
       "gb": "GB",
@@ -778,6 +786,7 @@
     },
     "sections": {
       "advanced": "高階",
+      "border": "邊框",
       "fileNaming": "檔案命名",
       "fileSettings": "檔案設定",
       "imageSizing": "影像大小",

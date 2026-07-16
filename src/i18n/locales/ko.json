@@ -738,6 +738,14 @@
       "preserveTimestamps": "EXIF 촬영 날짜로 파일 타임스탬프 설정",
       "title": "내보내기 설정"
     },
+    "border": {
+      "addBorder": "테두리 추가",
+      "aspectRatio": "종횡비",
+      "color": "색상",
+      "cornerRadius": "테두리 반경",
+      "originalRatio": "원본",
+      "width": "너비"
+    },
     "bytes": {
       "bytes": "바이트",
       "gb": "GB",
@@ -778,6 +786,7 @@
     },
     "sections": {
       "advanced": "고급",
+      "border": "테두리",
       "fileNaming": "파일 이름 지정",
       "fileSettings": "파일 설정",
       "imageSizing": "이미지 크기",

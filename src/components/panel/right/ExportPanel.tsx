@@ -157,6 +157,19 @@ function WatermarkPreview({
   );
 }
 
+const BORDER_ASPECT_RATIOS: Record<string, number | null> = {
+  original: null,
+  '1:1': 1,
+  '5:4': 5 / 4,
+  '4:5': 4 / 5,
+  '4:3': 4 / 3,
+  '3:4': 3 / 4,
+  '3:2': 3 / 2,
+  '2:3': 2 / 3,
+  '16:9': 16 / 9,
+  '9:16': 9 / 16,
+};
+
 const formatBytes = (bytes: number, t: any, decimals = 2) => {
   if (!+bytes) return `0 ${t('export.bytes.bytes')}`;
   const k = 1024;
@@ -230,6 +243,16 @@ export default function ExportPanel({
     setWatermarkSpacing,
     watermarkOpacity,
     setWatermarkOpacity,
+    enableBorder,
+    setEnableBorder,
+    borderWidth,
+    setBorderWidth,
+    borderColor,
+    setBorderColor,
+    borderCornerRadius,
+    setBorderCornerRadius,
+    borderAspectRatio,
+    setBorderAspectRatio,
     preserveFolders,
     setPreserveFolders,
     handleApplyPreset,
@@ -340,6 +363,15 @@ export default function ExportPanel({
     [t],
   );
 
+  const borderAspectRatioOptions = useMemo(
+    () =>
+      Object.keys(BORDER_ASPECT_RATIOS).map((key) => ({
+        label: key === 'original' ? t('export.border.originalRatio') : key,
+        value: key,
+      })),
+    [t],
+  );
+
   const debouncedEstimateSize = useMemo(
     () =>
       debounce(async (paths, currentAdj, currentPath, exportSettings, format) => {
@@ -386,6 +418,14 @@ export default function ExportPanel({
               opacity: watermarkOpacity,
             }
           : null,
+      border: enableBorder
+        ? {
+            width: borderWidth,
+            color: borderColor,
+            cornerRadius: borderCornerRadius,
+            aspectRatio: BORDER_ASPECT_RATIOS[borderAspectRatio] ?? null,
+          }
+        : null,
     };
     const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
     const runEstimate = () =>
@@ -420,6 +460,11 @@ export default function ExportPanel({
     watermarkScale,
     watermarkSpacing,
     watermarkOpacity,
+    enableBorder,
+    borderWidth,
+    borderColor,
+    borderCornerRadius,
+    borderAspectRatio,
     debouncedEstimateSize,
     exportMasks,
     preserveFolders,
@@ -472,6 +517,14 @@ export default function ExportPanel({
               opacity: watermarkOpacity,
             }
           : null,
+      border: enableBorder
+        ? {
+            width: borderWidth,
+            color: borderColor,
+            cornerRadius: borderCornerRadius,
+            aspectRatio: BORDER_ASPECT_RATIOS[borderAspectRatio] ?? null,
+          }
+        : null,
     };
 
     const lastExportPath = appSettings?.exportPresets?.find((p) => p.id === '__last_used__')?.lastExportPath;
@@ -780,6 +833,73 @@ export default function ExportPanel({
                           />
                         </>
                       )}
+                    </div>
+                  )}
+                </Section>
+
+                <Section title={t('export.sections.border')}>
+                  <Switch
+                    label={t('export.border.addBorder')}
+                    checked={enableBorder}
+                    onChange={setEnableBorder}
+                    disabled={isExporting}
+                    trackClassName="bg-surface"
+                  />
+                  {enableBorder && (
+                    <div className="space-y-4 pl-2 border-l-2 border-surface">
+                      <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
+                        <Slider
+                          label={t('export.border.width')}
+                          min={0}
+                          max={25}
+                          step={1}
+                          value={borderWidth}
+                          onChange={(e) => setBorderWidth(Number(e.target.value))}
+                          defaultValue={3}
+                        />
+                        <Slider
+                          label={t('export.border.cornerRadius')}
+                          min={0}
+                          max={50}
+                          step={1}
+                          value={borderCornerRadius}
+                          onChange={(e) => setBorderCornerRadius(Number(e.target.value))}
+                          defaultValue={0}
+                        />
+                      </div>
+                      <div>
+                        <Text variant={TextVariants.label} className="mb-1 block">
+                          {t('export.border.aspectRatio')}
+                        </Text>
+                        <Dropdown
+                          options={borderAspectRatioOptions}
+                          value={borderAspectRatio}
+                          onChange={setBorderAspectRatio}
+                          disabled={isExporting}
+                          className="w-full"
+                        />
+                      </div>
+                      <div>
+                        <Text variant={TextVariants.label} className="mb-1 block">
+                          {t('export.border.color')}
+                        </Text>
+                        <div className="flex items-center gap-2 bg-surface p-2 rounded-md">
+                          <input
+                            type="color"
+                            value={borderColor}
+                            onChange={(e) => setBorderColor(e.target.value)}
+                            disabled={isExporting}
+                            className="w-8 h-8 p-0 border-none rounded-sm cursor-pointer bg-transparent"
+                          />
+                          <input
+                            type="text"
+                            value={borderColor}
+                            onChange={(e) => setBorderColor(e.target.value)}
+                            disabled={isExporting}
+                            className="w-full bg-bg-primary text-center rounded-md p-1 border border-surface focus:border-accent focus:ring-accent"
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
                 </Section>

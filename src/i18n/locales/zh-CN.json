@@ -738,6 +738,14 @@
       "preserveTimestamps": "将文件时间戳设为 EXIF 拍摄日期",
       "title": "导出设置"
     },
+    "border": {
+      "addBorder": "添加边框",
+      "aspectRatio": "宽高比",
+      "color": "颜色",
+      "cornerRadius": "边框圆角",
+      "originalRatio": "原始",
+      "width": "宽度"
+    },
     "bytes": {
       "bytes": "字节",
       "gb": "GB",
@@ -778,6 +786,7 @@
     },
     "sections": {
       "advanced": "高级",
+      "border": "边框",
       "fileNaming": "文件命名",
       "fileSettings": "文件设置",
       "imageSizing": "图像大小",

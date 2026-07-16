@@ -782,6 +782,14 @@
       "preserveTimestamps": "Установить дату файла из EXIF даты съемки",
       "title": "Настройки экспорта"
     },
+    "border": {
+      "addBorder": "Добавить рамку",
+      "aspectRatio": "Соотношение сторон",
+      "color": "Цвет",
+      "cornerRadius": "Радиус скругления",
+      "originalRatio": "Исходный",
+      "width": "Ширина"
+    },
     "bytes": {
       "bytes": "Байт",
       "gb": "ГБ",
@@ -824,6 +832,7 @@
     },
     "sections": {
       "advanced": "Дополнительно",
+      "border": "Рамка",
       "fileNaming": "Именование файлов",
       "fileSettings": "Параметры файла",
       "imageSizing": "Размер изображения",

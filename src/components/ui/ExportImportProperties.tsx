@@ -45,6 +45,7 @@ export interface ExportSettings {
   } | null;
   stripGps: boolean;
   watermark: WatermarkSettings | null;
+  border: BorderSettings | null;
   exportMasks?: boolean;
   preserveFolders?: boolean;
 }
@@ -67,6 +68,13 @@ export interface WatermarkSettings {
   scale: number;
   spacing: number;
   opacity: number;
+}
+
+export interface BorderSettings {
+  width: number;
+  color: string;
+  cornerRadius: number;
+  aspectRatio: number | null;
 }
 
 export interface ExportState {
@@ -119,5 +127,10 @@ export interface ExportPreset {
   watermarkScale: number;
   watermarkSpacing: number;
   watermarkOpacity: number;
+  enableBorder?: boolean;
+  borderWidth?: number;
+  borderColor?: string;
+  borderCornerRadius?: number;
+  borderAspectRatio?: string;
   lastExportPath?: string;
 }
