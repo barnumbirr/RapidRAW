@@ -1984,6 +1984,32 @@ mod tests {
     }
 
     #[test]
+    fn border_settings_deserialize_from_frontend_payload() {
+        // Pin the wire format the export panel sends (camelCase keys).
+        let parsed: BorderSettings = serde_json::from_str(
+            r##"{"spacing":15.0,"color":"#FFFFFF","cornerRadius":10.0,"aspectRatio":0.8}"##,
+        )
+        .unwrap();
+        assert_eq!(parsed.spacing, 15.0);
+        assert_eq!(parsed.corner_radius, 10.0);
+        assert_eq!(parsed.aspect_ratio, Some(0.8));
+
+        let no_ratio: BorderSettings = serde_json::from_str(
+            r##"{"spacing":0.0,"color":"#000","cornerRadius":0.0,"aspectRatio":null}"##,
+        )
+        .unwrap();
+        assert_eq!(no_ratio.aspect_ratio, None);
+
+        // Payloads and saved presets that predate the border feature must
+        // keep deserializing, with the border defaulting to None.
+        let settings: ExportSettings = serde_json::from_str(
+            r#"{"jpegQuality":90,"resize":null,"keepMetadata":true,"stripGps":true,"filenameTemplate":null,"watermark":null}"#,
+        )
+        .unwrap();
+        assert!(settings.border.is_none());
+    }
+
+    #[test]
     fn apply_border_rejects_invalid_color() {
         let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(10, 10, Rgb([0, 0, 0])));
         assert!(
