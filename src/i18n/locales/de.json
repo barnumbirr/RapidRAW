@@ -255,6 +255,8 @@
       "duplicateImage": "Bild duplizieren",
       "exportImage_one": "Bild exportieren",
       "exportImage_other": "{{count}} Bilder exportieren",
+      "frameImages_one": "Bild rahmen",
+      "frameImages_other": "Bilder rahmen",
       "noAlbums": "Keine Alben verfügbar",
       "pasteAdjustments_one": "Einstellungen einfügen",
       "pasteAdjustments_other": "Einstellungen in {{count}} Bilder einfügen",
@@ -743,10 +745,10 @@
     "border": {
       "addBorder": "Rahmen hinzufügen",
       "aspectRatio": "Seitenverhältnis",
-      "color": "Farbe",
+      "background": "Hintergrund",
       "cornerRadius": "Eckenradius",
       "originalRatio": "Original",
-      "width": "Breite"
+      "spacing": "Abstand"
     },
     "bytes": {
       "bytes": "Bytes",

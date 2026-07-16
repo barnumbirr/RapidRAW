@@ -108,7 +108,7 @@ pub struct WatermarkSettings {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BorderSettings {
-    pub width: f32,
+    pub spacing: f32,
     pub color: String,
     pub corner_radius: f32,
     pub aspect_ratio: Option<f32>,
@@ -194,58 +194,95 @@ fn parse_hex_color(hex: &str) -> Option<[u8; 3]> {
     }
 }
 
-fn border_width_pixels(width: u32, height: u32, border: &BorderSettings) -> u32 {
-    let long_edge = width.max(height) as f32;
-    (long_edge * (border.width.clamp(0.0, 100.0) / 100.0)).round() as u32
+fn border_spacing_fraction(border: &BorderSettings) -> f32 {
+    // Spacing uses the collage modal's units: a fraction of the canvas width,
+    // where a value of 15 means 1.5% (15/1000). Clamped so the maths below
+    // always leaves room for the image.
+    border.spacing.clamp(0.0, 400.0) / 1000.0
 }
 
-fn corner_radius_pixels(width: u32, height: u32, border: &BorderSettings) -> f32 {
-    let short_edge = width.min(height) as f32;
-    short_edge * (border.corner_radius.clamp(0.0, 50.0) / 100.0)
-}
-
-fn bordered_dimensions(width: u32, height: u32, border: &BorderSettings) -> (u32, u32) {
-    let border_px = border_width_pixels(width, height, border);
-    let mut canvas_w = width + 2 * border_px;
-    let mut canvas_h = height + 2 * border_px;
-    if let Some(ratio) = border.aspect_ratio.filter(|r| *r > 0.0) {
-        // Only ever grow the canvas towards the target ratio so the image is never cropped.
-        let current = canvas_w as f32 / canvas_h as f32;
-        if current < ratio {
-            canvas_w = (canvas_h as f32 * ratio).round() as u32;
-        } else if current > ratio {
-            canvas_h = (canvas_w as f32 / ratio).round() as u32;
-        }
+/// Canvas size for framing an image, matching the collage modal's geometry:
+/// the image contain-fits into the canvas inset by `spacing/1000 * canvas
+/// width` on every side, and the canvas only ever grows towards the target
+/// aspect ratio so the image is never cropped.
+fn framed_canvas_size(width: u32, height: u32, border: &BorderSettings) -> (u32, u32) {
+    if width == 0 || height == 0 {
+        return (width, height);
     }
-    (canvas_w, canvas_h)
+    let f = border_spacing_fraction(border);
+    let image_ratio = width as f32 / height as f32;
+    let ratio = border
+        .aspect_ratio
+        .filter(|r| *r > 0.0)
+        .unwrap_or(image_ratio);
+
+    // Candidate canvas widths where the image exactly touches the inset
+    // rectangle on one axis; the larger one satisfies both axes.
+    let width_bound = width as f32 / (1.0 - 2.0 * f);
+    let height_bound = height as f32 * ratio / (1.0 - 2.0 * f * ratio).max(0.05);
+    let canvas_w = width_bound.max(height_bound);
+    let canvas_h = canvas_w / ratio;
+
+    (
+        (canvas_w.round() as u32).max(width),
+        (canvas_h.round() as u32).max(height),
+    )
 }
 
-/// Calls `f(x, y, coverage)` for every pixel in the four corner squares whose
-/// coverage by the rounded rectangle is below 1.0.
-fn for_each_corner_pixel(width: u32, height: u32, radius: f32, mut f: impl FnMut(u32, u32, f32)) {
-    let r_ceil = (radius.ceil() as u32).min(width / 2).min(height / 2);
-    if r_ceil == 0 {
+/// Calls `f(x, y, coverage)` for every image pixel whose coverage by the
+/// rounded inset rectangle (the collage modal's "cell") is below 1.0.
+/// Coordinates passed to `f` are image-relative.
+#[allow(clippy::too_many_arguments)]
+fn for_each_corner_pixel(
+    cell: (f32, f32, f32, f32),
+    radius: f32,
+    image_origin: (u32, u32),
+    image_size: (u32, u32),
+    mut f: impl FnMut(u32, u32, f32),
+) {
+    let (cell_x0, cell_y0, cell_x1, cell_y1) = cell;
+    let radius = radius
+        .min((cell_x1 - cell_x0) / 2.0)
+        .min((cell_y1 - cell_y0) / 2.0);
+    if radius < 1.0 {
         return;
     }
+    let (origin_x, origin_y) = image_origin;
+    let (img_w, img_h) = image_size;
     let corners = [
-        (0, 0, radius, radius),
-        (width - r_ceil, 0, width as f32 - radius, radius),
-        (0, height - r_ceil, radius, height as f32 - radius),
+        (cell_x0, cell_y0, cell_x0 + radius, cell_y0 + radius),
         (
-            width - r_ceil,
-            height - r_ceil,
-            width as f32 - radius,
-            height as f32 - radius,
+            cell_x1 - radius,
+            cell_y0,
+            cell_x1 - radius,
+            cell_y0 + radius,
+        ),
+        (
+            cell_x0,
+            cell_y1 - radius,
+            cell_x0 + radius,
+            cell_y1 - radius,
+        ),
+        (
+            cell_x1 - radius,
+            cell_y1 - radius,
+            cell_x1 - radius,
+            cell_y1 - radius,
         ),
     ];
-    for (origin_x, origin_y, center_x, center_y) in corners {
-        for y in origin_y..origin_y + r_ceil {
-            for x in origin_x..origin_x + r_ceil {
+    for (region_x, region_y, center_x, center_y) in corners {
+        // Intersect the corner square with the image rectangle (canvas coords).
+        let x_start = (region_x.floor().max(origin_x as f32)) as u32;
+        let y_start = (region_y.floor().max(origin_y as f32)) as u32;
+        let x_end = ((region_x + radius).ceil() as u32).min(origin_x + img_w);
+        let y_end = ((region_y + radius).ceil() as u32).min(origin_y + img_h);
+        for y in y_start..y_end {
+            for x in x_start..x_end {
                 let dx = x as f32 + 0.5 - center_x;
                 let dy = y as f32 + 0.5 - center_y;
                 let coverage = (radius + 0.5 - (dx * dx + dy * dy).sqrt()).clamp(0.0, 1.0);
                 if coverage < 1.0 {
-                    f(x, y, coverage);
+                    f(x - origin_x, y - origin_y, coverage);
                 }
             }
         }
@@ -260,8 +297,15 @@ fn apply_border(image: DynamicImage, border: &BorderSettings) -> Result<DynamicI
     if img_w == 0 || img_h == 0 {
         return Ok(image);
     }
-    let (canvas_w, canvas_h) = bordered_dimensions(img_w, img_h, border);
-    let radius = corner_radius_pixels(img_w, img_h, border);
+    let (canvas_w, canvas_h) = framed_canvas_size(img_w, img_h, border);
+    let inset = border_spacing_fraction(border) * canvas_w as f32;
+    let cell = (
+        inset,
+        inset,
+        canvas_w as f32 - inset,
+        canvas_h as f32 - inset,
+    );
+    let radius = (border.corner_radius.clamp(0.0, 500.0) / 1000.0) * canvas_w as f32;
     if canvas_w == img_w && canvas_h == img_h && radius < 1.0 {
         return Ok(image);
     }
@@ -279,27 +323,39 @@ fn apply_border(image: DynamicImage, border: &BorderSettings) -> Result<DynamicI
         let source = image.into_rgb32f();
         let mut canvas = Rgb32FImage::from_pixel(canvas_w, canvas_h, color);
         imageops::replace(&mut canvas, &source, offset_x as i64, offset_y as i64);
-        for_each_corner_pixel(img_w, img_h, radius, |x, y, coverage| {
-            let src_pixel = source.get_pixel(x, y);
-            let out = canvas.get_pixel_mut(offset_x + x, offset_y + y);
-            for c in 0..3 {
-                out.0[c] = color.0[c] + (src_pixel.0[c] - color.0[c]) * coverage;
-            }
-        });
+        for_each_corner_pixel(
+            cell,
+            radius,
+            (offset_x, offset_y),
+            (img_w, img_h),
+            |x, y, coverage| {
+                let src_pixel = source.get_pixel(x, y);
+                let out = canvas.get_pixel_mut(offset_x + x, offset_y + y);
+                for c in 0..3 {
+                    out.0[c] = color.0[c] + (src_pixel.0[c] - color.0[c]) * coverage;
+                }
+            },
+        );
         Ok(DynamicImage::ImageRgb32F(canvas))
     } else {
         let color = Rgb([red, green, blue]);
         let source = image.into_rgb8();
         let mut canvas = RgbImage::from_pixel(canvas_w, canvas_h, color);
         imageops::replace(&mut canvas, &source, offset_x as i64, offset_y as i64);
-        for_each_corner_pixel(img_w, img_h, radius, |x, y, coverage| {
-            let src_pixel = source.get_pixel(x, y);
-            let out = canvas.get_pixel_mut(offset_x + x, offset_y + y);
-            for c in 0..3 {
-                let base = color.0[c] as f32;
-                out.0[c] = (base + (src_pixel.0[c] as f32 - base) * coverage).round() as u8;
-            }
-        });
+        for_each_corner_pixel(
+            cell,
+            radius,
+            (offset_x, offset_y),
+            (img_w, img_h),
+            |x, y, coverage| {
+                let src_pixel = source.get_pixel(x, y);
+                let out = canvas.get_pixel_mut(offset_x + x, offset_y + y);
+                for c in 0..3 {
+                    let base = color.0[c] as f32;
+                    out.0[c] = (base + (src_pixel.0[c] as f32 - base) * coverage).round() as u8;
+                }
+            },
+        );
         Ok(DynamicImage::ImageRgb8(canvas))
     }
 }
@@ -1646,7 +1702,7 @@ pub async fn estimate_export_sizes(
             (full_w, full_h)
         };
         let (final_full_w, final_full_h) = match &export_settings.border {
-            Some(border) => bordered_dimensions(final_full_w, final_full_h, border),
+            Some(border) => framed_canvas_size(final_full_w, final_full_h, border),
             None => (final_full_w, final_full_h),
         };
 
@@ -1787,7 +1843,7 @@ pub async fn estimate_export_sizes(
             (full_w, full_h)
         };
         let (final_full_w, final_full_h) = match &export_settings.border {
-            Some(border) => bordered_dimensions(final_full_w, final_full_h, border),
+            Some(border) => framed_canvas_size(final_full_w, final_full_h, border),
             None => (final_full_w, final_full_h),
         };
 
@@ -1809,9 +1865,9 @@ pub async fn estimate_export_sizes(
 mod tests {
     use super::*;
 
-    fn border(width: f32, corner_radius: f32, aspect_ratio: Option<f32>) -> BorderSettings {
+    fn border(spacing: f32, corner_radius: f32, aspect_ratio: Option<f32>) -> BorderSettings {
         BorderSettings {
-            width,
+            spacing,
             color: "#FFFFFF".to_string(),
             corner_radius,
             aspect_ratio,
@@ -1832,65 +1888,99 @@ mod tests {
         assert_eq!(parse_hex_color(""), None);
         assert_eq!(parse_hex_color("#12345"), None);
         assert_eq!(parse_hex_color("#gggggg"), None);
-        assert_eq!(parse_hex_color("#éééééé"), None);
+        assert_eq!(
+            parse_hex_color("#\u{e9}\u{e9}\u{e9}\u{e9}\u{e9}\u{e9}"),
+            None
+        );
     }
 
     #[test]
-    fn bordered_dimensions_adds_border_on_all_sides() {
-        // 3% of the 2000px long edge = 60px per side.
+    fn framed_canvas_matches_collage_modal_geometry() {
+        // Landscape 2:1 at spacing 15 (1.5% of canvas width): the height is
+        // the binding axis, giving a canvas of 2128x1064 with a vertical gap
+        // of exactly spacing and a horizontal gap of ratio * spacing - the
+        // same contain-fit the collage modal produces.
         assert_eq!(
-            bordered_dimensions(2000, 1000, &border(3.0, 0.0, None)),
-            (2120, 1120)
+            framed_canvas_size(2000, 1000, &border(15.0, 0.0, None)),
+            (2128, 1064)
         );
+        // Portrait: the width binds instead.
         assert_eq!(
-            bordered_dimensions(2000, 1000, &border(0.0, 0.0, None)),
+            framed_canvas_size(1000, 1500, &border(15.0, 0.0, None)),
+            (1031, 1546)
+        );
+        // No spacing, no ratio: no-op.
+        assert_eq!(
+            framed_canvas_size(2000, 1000, &border(0.0, 0.0, None)),
             (2000, 1000)
         );
     }
 
     #[test]
-    fn bordered_dimensions_pads_to_target_ratio_without_cropping() {
+    fn framed_canvas_pads_to_target_ratio_without_cropping() {
         // Landscape image padded to a square canvas: height grows to match width.
-        let (w, h) = bordered_dimensions(2000, 1000, &border(0.0, 0.0, Some(1.0)));
-        assert_eq!((w, h), (2000, 2000));
+        assert_eq!(
+            framed_canvas_size(2000, 1000, &border(0.0, 0.0, Some(1.0))),
+            (2000, 2000)
+        );
         // Portrait target on a landscape image: the canvas only ever grows.
-        let (w, h) = bordered_dimensions(2000, 1000, &border(0.0, 0.0, Some(4.0 / 5.0)));
+        let (w, h) = framed_canvas_size(2000, 1000, &border(0.0, 0.0, Some(4.0 / 5.0)));
         assert!(w >= 2000 && h >= 1000);
         assert!((w as f32 / h as f32 - 0.8).abs() < 0.01);
     }
 
     #[test]
     fn apply_border_wraps_image_in_solid_color() {
-        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(100, 50, Rgb([10, 20, 30])));
-        let result = apply_border(image, &border(10.0, 0.0, None)).unwrap();
-        // 10% of the 100px long edge = 10px per side.
-        assert_eq!(result.dimensions(), (120, 70));
+        // Square image, spacing 100 (10% of canvas width per side): canvas is
+        // 125x125 with the image centered at (12,12)..(112,112).
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(100, 100, Rgb([10, 20, 30])));
+        let result = apply_border(image, &border(100.0, 0.0, None)).unwrap();
+        assert_eq!(result.dimensions(), (125, 125));
         let rgb = result.to_rgb8();
         assert_eq!(rgb.get_pixel(0, 0), &Rgb([255, 255, 255]));
-        assert_eq!(rgb.get_pixel(60, 35), &Rgb([10, 20, 30]));
-        assert_eq!(rgb.get_pixel(10, 10), &Rgb([10, 20, 30]));
+        assert_eq!(rgb.get_pixel(62, 62), &Rgb([10, 20, 30]));
+        assert_eq!(rgb.get_pixel(13, 13), &Rgb([10, 20, 30]));
+        assert_eq!(rgb.get_pixel(5, 5), &Rgb([255, 255, 255]));
     }
 
     #[test]
     fn apply_border_preserves_f32_pipeline_images() {
         let image =
             DynamicImage::ImageRgb32F(Rgb32FImage::from_pixel(100, 50, Rgb([0.5, 0.5, 0.5])));
-        let result = apply_border(image, &border(10.0, 0.0, None)).unwrap();
+        let result = apply_border(image, &border(100.0, 0.0, None)).unwrap();
         assert!(matches!(result, DynamicImage::ImageRgb32F(_)));
-        assert_eq!(result.dimensions(), (120, 70));
+        assert!(result.dimensions().0 > 100 && result.dimensions().1 > 50);
     }
 
     #[test]
     fn apply_border_rounds_corners_with_border_color() {
+        // No spacing: the cell is the whole canvas, so the corner arcs clip
+        // the image itself. Radius 200 = 20% of the 100px canvas = 20px.
         let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(100, 100, Rgb([0, 0, 0])));
-        let result = apply_border(image, &border(10.0, 20.0, None)).unwrap();
+        let result = apply_border(image, &border(0.0, 200.0, None)).unwrap();
+        assert_eq!(result.dimensions(), (100, 100));
         let rgb = result.to_rgb8();
-        // The image's corner pixel (offset 10,10) sits outside the rounded
-        // rectangle (radius 20px) and must be filled with the border color.
-        assert_eq!(rgb.get_pixel(10, 10), &Rgb([255, 255, 255]));
-        // The image center and edge midpoints are untouched.
-        assert_eq!(rgb.get_pixel(60, 60), &Rgb([0, 0, 0]));
-        assert_eq!(rgb.get_pixel(60, 10), &Rgb([0, 0, 0]));
+        // The image corner sits outside the 20px arc and takes the fill color.
+        assert_eq!(rgb.get_pixel(0, 0), &Rgb([255, 255, 255]));
+        assert_eq!(rgb.get_pixel(99, 0), &Rgb([255, 255, 255]));
+        // Edge midpoints and the center are untouched.
+        assert_eq!(rgb.get_pixel(50, 0), &Rgb([0, 0, 0]));
+        assert_eq!(rgb.get_pixel(50, 50), &Rgb([0, 0, 0]));
+    }
+
+    #[test]
+    fn apply_border_keeps_inset_image_corners_square() {
+        // With spacing, the rounded "cell" is inset; this landscape image sits
+        // well inside the cell's left/right edges (inset ~9.5px, radius
+        // ~2.4px), so its own corners stay intact - exactly like the collage
+        // modal's clipping.
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(200, 100, Rgb([0, 0, 0])));
+        let result = apply_border(image, &border(40.0, 10.0, None)).unwrap();
+        let rgb = result.to_rgb8();
+        assert_eq!(rgb.dimensions(), (238, 119));
+        let (ox, oy) = ((238 - 200) / 2, (119 - 100) / 2);
+        assert_eq!(rgb.get_pixel(ox, oy), &Rgb([0, 0, 0]));
+        assert_eq!(rgb.get_pixel(ox + 199, oy + 99), &Rgb([0, 0, 0]));
     }
 
     #[test]
@@ -1900,7 +1990,7 @@ mod tests {
             apply_border(
                 image,
                 &BorderSettings {
-                    width: 5.0,
+                    spacing: 5.0,
                     color: "not-a-color".to_string(),
                     corner_radius: 0.0,
                     aspect_ratio: None,

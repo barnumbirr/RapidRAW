@@ -30,6 +30,7 @@ interface CollageModalProps {
   onSave(base64Data: string, firstPath: string): Promise<string>;
   sourceImages: Array<Pick<ImageFile, 'path'>>;
   thumbnails: Record<string, string>;
+  frameMode?: boolean;
 }
 
 interface LoadedImage {
@@ -55,7 +56,7 @@ const DEFAULT_EXPORT_WIDTH = 3000;
 const INITIAL_SPACING = 15;
 const INITIAL_BORDER_RADIUS = 0;
 
-export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: CollageModalProps) {
+export default function CollageModal({ isOpen, onClose, onSave, sourceImages, frameMode = false }: CollageModalProps) {
   const { t } = useTranslation();
 
   const ASPECT_RATIO_PRESETS: AspectRatioPreset[] = useMemo(
@@ -92,11 +93,21 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
 
   const [loadedImages, setLoadedImages] = useState<LoadedImage[]>([]);
   const [imageStates, setImageStates] = useState<Record<string, ImageState>>({});
+  const [frameIndex, setFrameIndex] = useState(0);
+
+  // In frame mode the preview and layout operate on one image at a time; the
+  // save step then applies the same settings to every loaded image.
+  const displayImages = useMemo(
+    () => (frameMode ? loadedImages.slice(frameIndex, frameIndex + 1) : loadedImages),
+    [frameMode, loadedImages, frameIndex],
+  );
 
   const [panningImage, setPanningImage] = useState<{ index: number; startX: number; startY: number } | null>(null);
   const [thumbnailDrag, setThumbnailDrag] = useState<{ path: string; url: string; x: number; y: number } | null>(null);
   const [hoveredCellIndex, setHoveredCellIndex] = useState<number | null>(null);
   const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 });
+
+  const overlaySpacing = (spacing / 1000) * previewSize.width;
 
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -132,6 +143,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
         setBackgroundColor('#FFFFFF');
         setSpacing(INITIAL_SPACING);
         setBorderRadius(INITIAL_BORDER_RADIUS);
+        setFrameIndex(0);
       }, 300);
       return () => clearTimeout(timer);
     }
@@ -167,7 +179,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
         });
 
         const results = await Promise.all(imagePromises);
-        if (results.length === 1) {
+        if (results.length === 1 || frameMode) {
           const img = results[0];
           const ratio = img.width / img.height;
           setActiveAspectRatio({ id: 'original', name: t('modals.collage.original'), value: ratio });
@@ -193,16 +205,16 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       clearTimeout(timerId);
       Object.values(imageElementsRef.current).forEach((img) => URL.revokeObjectURL(img.src));
     };
-  }, [isOpen, sourceImages, t]);
+  }, [isOpen, sourceImages, t, frameMode]);
 
   useEffect(() => {
-    if (loadedImages.length > 0) {
-      const layoutsForCount = LAYOUTS[loadedImages.length] || [];
+    if (displayImages.length > 0) {
+      const layoutsForCount = frameMode ? [] : LAYOUTS[displayImages.length] || [];
       setAvailableLayouts(layoutsForCount);
       if (activeLayout === null) {
         if (layoutsForCount.length > 0) {
           setActiveLayout(layoutsForCount[0].layout);
-        } else if (loadedImages.length === 1) {
+        } else if (displayImages.length === 1) {
           setActiveLayout([{ x: 0, y: 0, width: 1, height: 1 }]);
         }
       }
@@ -210,7 +222,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       setAvailableLayouts([]);
       setActiveLayout(null);
     }
-  }, [loadedImages, activeLayout]);
+  }, [displayImages, activeLayout, frameMode]);
 
   useLayoutEffect(() => {
     const container = previewContainerRef.current;
@@ -240,8 +252,13 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   }, [activeAspectRatio, isLoading]);
 
   const drawCanvas = useCallback(
-    (canvas: HTMLCanvasElement | null, isExport: boolean = false) => {
-      if (!canvas || !activeLayout || loadedImages.length === 0 || (previewSize.width === 0 && !isExport)) return;
+    (
+      canvas: HTMLCanvasElement | null,
+      isExport: boolean = false,
+      images: LoadedImage[] = displayImages,
+      exportDims?: { width: number; height: number },
+    ) => {
+      if (!canvas || !activeLayout || images.length === 0 || (previewSize.width === 0 && !isExport)) return;
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -252,10 +269,10 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       const dpr = isExport ? 1 : window.devicePixelRatio || 1;
 
       if (isExport) {
-        canvasWidth = exportWidth;
-        canvasHeight = exportHeight;
+        canvasWidth = exportDims?.width ?? exportWidth;
+        canvasHeight = exportDims?.height ?? exportHeight;
         if (previewSize.width > 0) {
-          exportScale = exportWidth / previewSize.width;
+          exportScale = canvasWidth / previewSize.width;
         }
       } else {
         canvasWidth = previewSize.width;
@@ -272,14 +289,17 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       ctx.fillStyle = backgroundColor;
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-      loadedImages.forEach((image, index) => {
+      images.forEach((image, index) => {
         const cell = activeLayout[index];
         if (!cell) return;
         const img = imageElementsRef.current[image.path];
         if (!img) return;
 
-        const scaledSpacing = spacing * exportScale;
-        const scaledRadius = borderRadius * exportScale;
+        // Spacing and radius are fractions of the canvas width (0-50 maps to
+        // 0-5%), so the same value renders identically at any preview size and
+        // matches the export pipeline's border option.
+        const scaledSpacing = (spacing / 1000) * canvasWidth;
+        const scaledRadius = (borderRadius / 1000) * canvasWidth;
 
         const x1 = cell.x * canvasWidth;
         const y1 = cell.y * canvasHeight;
@@ -345,7 +365,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     },
     [
       activeLayout,
-      loadedImages,
+      displayImages,
       imageStates,
       spacing,
       borderRadius,
@@ -368,9 +388,19 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     resetImageOffsets();
   };
 
+  useEffect(() => {
+    if (!frameMode || isLoading) return;
+    const img = loadedImages[frameIndex];
+    if (img && activeAspectRatio.id === 'original') {
+      const ratio = img.width / img.height;
+      setActiveAspectRatio({ id: 'original', name: t('modals.collage.original'), value: ratio });
+      setExportHeight(Math.round(exportWidth / ratio));
+    }
+  }, [frameIndex, frameMode, isLoading]);
+
   const handleOriginalAspectRatio = () => {
-    if (loadedImages.length !== 1) return;
-    const img = loadedImages[0];
+    if (displayImages.length === 0) return;
+    const img = displayImages[0];
     const ratio = img.width / img.height;
 
     setActiveAspectRatio({ id: 'original', name: t('modals.collage.original'), value: ratio });
@@ -415,11 +445,26 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     if (isSaving || !activeLayout) return;
     setIsSaving(true);
     try {
-      const offscreenCanvas = document.createElement('canvas');
-      drawCanvas(offscreenCanvas, true);
-      const base64Data = offscreenCanvas.toDataURL('image/png');
-      const path = await onSave(base64Data, sourceImages[0].path);
-      setSavedPath(path);
+      if (frameMode) {
+        // Apply the same frame settings to every image, saving one file each.
+        let lastPath = '';
+        for (const image of loadedImages) {
+          const ratio = activeAspectRatio.id === 'original' ? image.width / image.height : activeAspectRatio.value || 1;
+          const offscreenCanvas = document.createElement('canvas');
+          drawCanvas(offscreenCanvas, true, [image], {
+            width: exportWidth,
+            height: Math.round(exportWidth / ratio),
+          });
+          lastPath = await onSave(offscreenCanvas.toDataURL('image/png'), image.path);
+        }
+        setSavedPath(lastPath);
+      } else {
+        const offscreenCanvas = document.createElement('canvas');
+        drawCanvas(offscreenCanvas, true);
+        const base64Data = offscreenCanvas.toDataURL('image/png');
+        const path = await onSave(base64Data, sourceImages[0].path);
+        setSavedPath(path);
+      }
     } catch (err: any) {
       setError(err.message || 'Could not save the collage.');
     } finally {
@@ -437,7 +482,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     if (!activeLayout || keepOriginalRatio) return;
     e.preventDefault();
 
-    const path = loadedImages[index].path;
+    const path = displayImages[index].path;
     const currentState = imageStates[path] || { offsetX: 0, offsetY: 0, scale: 1 };
 
     const oldScale = currentState.scale || 1;
@@ -457,14 +502,21 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     let newOffsetX = mouseX - (mouseX - currentState.offsetX) * scaleRatio;
     let newOffsetY = mouseY - (mouseY - currentState.offsetY) * scaleRatio;
 
+    const previewSpacing = (spacing / 1000) * previewSize.width;
     const x1 = cell.x * previewSize.width;
     const y1 = cell.y * previewSize.height;
     const x2 = (cell.x + cell.width) * previewSize.width;
     const y2 = (cell.y + cell.height) * previewSize.height;
     const cellFinalWidth =
-      x2 - x1 - (cell.x === 0 ? spacing : spacing / 2) - (cell.x + cell.width >= 1 ? spacing : spacing / 2);
+      x2 -
+      x1 -
+      (cell.x === 0 ? previewSpacing : previewSpacing / 2) -
+      (cell.x + cell.width >= 1 ? previewSpacing : previewSpacing / 2);
     const cellFinalHeight =
-      y2 - y1 - (cell.y === 0 ? spacing : spacing / 2) - (cell.y + cell.height >= 1 ? spacing : spacing / 2);
+      y2 -
+      y1 -
+      (cell.y === 0 ? previewSpacing : previewSpacing / 2) -
+      (cell.y + cell.height >= 1 ? previewSpacing : previewSpacing / 2);
 
     const imageRatio = img.width / img.height;
     const cellRatio = cellFinalWidth / cellFinalHeight;
@@ -497,19 +549,26 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   useEffect(() => {
     const handleWindowMouseMove = (e: MouseEvent) => {
       if (panningImage && activeLayout) {
-        const imagePath = loadedImages[panningImage.index].path;
+        const imagePath = displayImages[panningImage.index].path;
         const imageState = imageStates[imagePath];
         const img = imageElementsRef.current[imagePath];
         const cell = activeLayout[panningImage.index];
 
+        const previewSpacing = (spacing / 1000) * previewSize.width;
         const x1 = cell.x * previewSize.width;
         const y1 = cell.y * previewSize.height;
         const x2 = (cell.x + cell.width) * previewSize.width;
         const y2 = (cell.y + cell.height) * previewSize.height;
         const cellFinalWidth =
-          x2 - x1 - (cell.x === 0 ? spacing : spacing / 2) - (cell.x + cell.width >= 1 ? spacing : spacing / 2);
+          x2 -
+          x1 -
+          (cell.x === 0 ? previewSpacing : previewSpacing / 2) -
+          (cell.x + cell.width >= 1 ? previewSpacing : previewSpacing / 2);
         const cellFinalHeight =
-          y2 - y1 - (cell.y === 0 ? spacing : spacing / 2) - (cell.y + cell.height >= 1 ? spacing : spacing / 2);
+          y2 -
+          y1 -
+          (cell.y === 0 ? previewSpacing : previewSpacing / 2) -
+          (cell.y + cell.height >= 1 ? previewSpacing : previewSpacing / 2);
 
         const imageRatio = img.width / img.height;
         const cellRatio = cellFinalWidth / cellFinalHeight;
@@ -598,11 +657,11 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
     };
-  }, [panningImage, thumbnailDrag, activeLayout, previewSize, spacing, loadedImages, imageStates, hoveredCellIndex]);
+  }, [panningImage, thumbnailDrag, activeLayout, previewSize, spacing, displayImages, imageStates, hoveredCellIndex]);
 
   const renderControls = () => (
     <div className="modal-adjustments-pane w-80 shrink-0 bg-bg-secondary p-4 flex flex-col gap-8 overflow-y-auto border-l border-surface h-full">
-      {loadedImages.length > 1 && (
+      {!frameMode && loadedImages.length > 1 && (
         <div>
           <Text variant={TextVariants.heading} className="mb-2 flex items-center justify-between">
             <span className="flex items-center gap-2">
@@ -667,7 +726,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
               {preset.name}
             </button>
           ))}
-          {loadedImages.length === 1 && (
+          {(frameMode || loadedImages.length === 1) && (
             <button
               onClick={handleOriginalAspectRatio}
               className={clsx(
@@ -843,11 +902,11 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
                             transition={{ duration: 0.15 }}
                             className="absolute bg-accent/30 border-2 border-accent backdrop-blur-[1px]"
                             style={{
-                              top: cell.y === 0 ? spacing : spacing / 2,
-                              left: cell.x === 0 ? spacing : spacing / 2,
-                              right: cell.x + cell.width >= 0.99 ? spacing : spacing / 2,
-                              bottom: cell.y + cell.height >= 0.99 ? spacing : spacing / 2,
-                              borderRadius: borderRadius,
+                              top: cell.y === 0 ? overlaySpacing : overlaySpacing / 2,
+                              left: cell.x === 0 ? overlaySpacing : overlaySpacing / 2,
+                              right: cell.x + cell.width >= 0.99 ? overlaySpacing : overlaySpacing / 2,
+                              bottom: cell.y + cell.height >= 0.99 ? overlaySpacing : overlaySpacing / 2,
+                              borderRadius: (borderRadius / 1000) * previewSize.width,
                             }}
                           />
                         )}
@@ -863,6 +922,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
               const loadedData = loadedImages.find((l) => l.path === sourceImg.path);
               if (!loadedData) return null;
 
+              const loadedIndex = loadedImages.indexOf(loadedData);
               return (
                 <motion.div
                   key={`${sourceImg.path}-${idx}`}
@@ -873,8 +933,19 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
                   <img
                     src={loadedData.url}
                     alt=""
-                    onMouseDown={(e) => handleThumbnailMouseDown(e, sourceImg.path, loadedData.url)}
-                    className="h-20 w-20 shrink-0 object-cover rounded-md cursor-grab active:cursor-grabbing hover:ring-2 hover:ring-accent transition-all select-none shadow-xs"
+                    onMouseDown={
+                      frameMode
+                        ? () => setFrameIndex(loadedIndex)
+                        : (e) => handleThumbnailMouseDown(e, sourceImg.path, loadedData.url)
+                    }
+                    className={clsx(
+                      'h-20 w-20 shrink-0 object-cover rounded-md hover:ring-2 hover:ring-accent transition-all select-none shadow-xs',
+                      frameMode
+                        ? loadedIndex === frameIndex
+                          ? 'cursor-pointer ring-2 ring-accent'
+                          : 'cursor-pointer'
+                        : 'cursor-grab active:cursor-grabbing',
+                    )}
                   />
                 </motion.div>
               );

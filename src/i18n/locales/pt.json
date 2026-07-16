@@ -267,6 +267,9 @@
       "exportImage_many": "Exportar {{count}} Imagens",
       "exportImage_one": "Exportar Imagem",
       "exportImage_other": "Exportar {{count}} Imagens",
+      "frameImages_many": "Emoldurar Imagens",
+      "frameImages_one": "Emoldurar Imagem",
+      "frameImages_other": "Emoldurar Imagens",
       "noAlbums": "Nenhum Álbum Disponível",
       "pasteAdjustments_many": "Colar Ajustes em {{count}} Imagens",
       "pasteAdjustments_one": "Colar Ajustes",
@@ -764,10 +767,10 @@
     "border": {
       "addBorder": "Adicionar Borda",
       "aspectRatio": "Proporção de Tela",
-      "color": "Cor",
+      "background": "Fundo",
       "cornerRadius": "Raio da Borda",
       "originalRatio": "Original",
-      "width": "Largura"
+      "spacing": "Espaçamento"
     },
     "bytes": {
       "bytes": "Bytes",

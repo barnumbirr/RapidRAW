@@ -21,7 +21,7 @@ export function useExportSettings() {
   const [watermarkSpacing, setWatermarkSpacing] = useState(5);
   const [watermarkOpacity, setWatermarkOpacity] = useState(75);
   const [enableBorder, setEnableBorder] = useState(false);
-  const [borderWidth, setBorderWidth] = useState(3);
+  const [borderSpacing, setBorderSpacing] = useState(15);
   const [borderColor, setBorderColor] = useState('#FFFFFF');
   const [borderCornerRadius, setBorderCornerRadius] = useState(0);
   const [borderAspectRatio, setBorderAspectRatio] = useState('original');
@@ -46,7 +46,7 @@ export function useExportSettings() {
     setWatermarkSpacing(preset.watermarkSpacing);
     setWatermarkOpacity(preset.watermarkOpacity);
     setEnableBorder(preset.enableBorder ?? false);
-    setBorderWidth(preset.borderWidth ?? 3);
+    setBorderSpacing(preset.borderSpacing ?? 15);
     setBorderColor(preset.borderColor ?? '#FFFFFF');
     setBorderCornerRadius(preset.borderCornerRadius ?? 0);
     setBorderAspectRatio(preset.borderAspectRatio ?? 'original');
@@ -73,7 +73,7 @@ export function useExportSettings() {
       watermarkSpacing,
       watermarkOpacity,
       enableBorder,
-      borderWidth,
+      borderSpacing,
       borderColor,
       borderCornerRadius,
       borderAspectRatio,
@@ -98,7 +98,7 @@ export function useExportSettings() {
       watermarkSpacing,
       watermarkOpacity,
       enableBorder,
-      borderWidth,
+      borderSpacing,
       borderColor,
       borderCornerRadius,
       borderAspectRatio,
@@ -144,8 +144,8 @@ export function useExportSettings() {
     setWatermarkOpacity,
     enableBorder,
     setEnableBorder,
-    borderWidth,
-    setBorderWidth,
+    borderSpacing,
+    setBorderSpacing,
     borderColor,
     setBorderColor,
     borderCornerRadius,

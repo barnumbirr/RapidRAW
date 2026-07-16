@@ -279,6 +279,10 @@
       "exportImage_many": "Eksportuj {{count}} obrazów",
       "exportImage_one": "Eksportuj obraz",
       "exportImage_other": "Eksportuj {{count}} obrazów",
+      "frameImages_few": "Dodaj ramki do obrazów",
+      "frameImages_many": "Dodaj ramki do obrazów",
+      "frameImages_one": "Dodaj ramkę do obrazu",
+      "frameImages_other": "Dodaj ramki do obrazów",
       "noAlbums": "Brak dostępnych albumów",
       "pasteAdjustments_few": "Wklej ustawienia do {{count}} obrazów",
       "pasteAdjustments_many": "Wklej ustawienia do {{count}} obrazów",
@@ -785,10 +789,10 @@
     "border": {
       "addBorder": "Dodaj ramkę",
       "aspectRatio": "Proporcje",
-      "color": "Kolor",
+      "background": "Tło",
       "cornerRadius": "Promień zaokrąglenia rogów",
       "originalRatio": "Oryginalny",
-      "width": "Szerokość"
+      "spacing": "Odstępy"
     },
     "bytes": {
       "bytes": "Bajty",

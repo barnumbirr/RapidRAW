@@ -255,6 +255,8 @@
       "duplicateImage": "複製影像",
       "exportImage_one": "匯出影像",
       "exportImage_other": "匯出 {{count}} 張影像",
+      "frameImages_one": "裝裱影像",
+      "frameImages_other": "裝裱影像",
       "noAlbums": "無可用相簿",
       "pasteAdjustments_one": "貼上調整",
       "pasteAdjustments_other": "貼上調整到 {{count}} 張影像",
@@ -741,10 +743,10 @@
     "border": {
       "addBorder": "新增邊框",
       "aspectRatio": "寬高比",
-      "color": "顏色",
+      "background": "背景",
       "cornerRadius": "邊框圓角",
       "originalRatio": "原始",
-      "width": "寬度"
+      "spacing": "間距"
     },
     "bytes": {
       "bytes": "位元組",

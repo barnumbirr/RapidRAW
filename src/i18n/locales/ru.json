@@ -279,6 +279,10 @@
       "exportImage_many": "Экспортировать {{count}} изображений",
       "exportImage_one": "Экспортировать изображение",
       "exportImage_other": "Экспортировать {{count}} изображений",
+      "frameImages_few": "Добавить рамки",
+      "frameImages_many": "Добавить рамки",
+      "frameImages_one": "Добавить рамку",
+      "frameImages_other": "Добавить рамки",
       "noAlbums": "Нет доступных альбомов",
       "pasteAdjustments_few": "Вставить настройки для {{count}} изображений",
       "pasteAdjustments_many": "Вставить настройки для {{count}} изображений",
@@ -785,10 +789,10 @@
     "border": {
       "addBorder": "Добавить рамку",
       "aspectRatio": "Соотношение сторон",
-      "color": "Цвет",
+      "background": "Задний план",
       "cornerRadius": "Радиус скругления",
       "originalRatio": "Исходный",
-      "width": "Ширина"
+      "spacing": "Интервал"
     },
     "bytes": {
       "bytes": "Байт",

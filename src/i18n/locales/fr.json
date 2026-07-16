@@ -267,6 +267,9 @@
       "exportImage_many": "Exporter {{count}} images",
       "exportImage_one": "Exporter l'image",
       "exportImage_other": "Exporter {{count}} images",
+      "frameImages_many": "Encadrer les images",
+      "frameImages_one": "Encadrer l'image",
+      "frameImages_other": "Encadrer les images",
       "noAlbums": "Aucun album disponible",
       "pasteAdjustments_many": "Coller les ajustements sur {{count}} images",
       "pasteAdjustments_one": "Coller les ajustements",
@@ -764,10 +767,10 @@
     "border": {
       "addBorder": "Ajouter une bordure",
       "aspectRatio": "Rapport d'aspect",
-      "color": "Couleur",
+      "background": "Arrière-plan",
       "cornerRadius": "Rayon de bordure",
       "originalRatio": "Original",
-      "width": "Largeur"
+      "spacing": "Espacement"
     },
     "bytes": {
       "bytes": "Octets",

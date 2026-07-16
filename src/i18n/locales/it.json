@@ -267,6 +267,9 @@
       "exportImage_many": "Esporta {{count}} Immagini",
       "exportImage_one": "Esporta Immagine",
       "exportImage_other": "Esporta {{count}} Immagini",
+      "frameImages_many": "Incornicia Immagini",
+      "frameImages_one": "Incornicia Immagine",
+      "frameImages_other": "Incornicia Immagini",
       "noAlbums": "Nessun Album Disponibile",
       "pasteAdjustments_many": "Incolla Regolazioni su {{count}} Immagini",
       "pasteAdjustments_one": "Incolla Regolazioni",
@@ -764,10 +767,10 @@
     "border": {
       "addBorder": "Aggiungi Bordo",
       "aspectRatio": "Proporzioni",
-      "color": "Colore",
+      "background": "Sfondo",
       "cornerRadius": "Raggio del Bordo",
       "originalRatio": "Originale",
-      "width": "Larghezza"
+      "spacing": "Spaziatura"
     },
     "bytes": {
       "bytes": "Byte",

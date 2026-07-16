@@ -71,7 +71,7 @@ export interface WatermarkSettings {
 }
 
 export interface BorderSettings {
-  width: number;
+  spacing: number;
   color: string;
   cornerRadius: number;
   aspectRatio: number | null;
@@ -128,7 +128,7 @@ export interface ExportPreset {
   watermarkSpacing: number;
   watermarkOpacity: number;
   enableBorder?: boolean;
-  borderWidth?: number;
+  borderSpacing?: number;
   borderColor?: string;
   borderCornerRadius?: number;
   borderAspectRatio?: string;

@@ -255,6 +255,8 @@
       "duplicateImage": "이미지 복제",
       "exportImage_one": "이미지 내보내기",
       "exportImage_other": "이미지 {{count}}개 내보내기",
+      "frameImages_one": "이미지 프레임",
+      "frameImages_other": "이미지 프레임",
       "noAlbums": "사용 가능한 앨범 없음",
       "pasteAdjustments_one": "조정값 붙여넣기",
       "pasteAdjustments_other": "이미지 {{count}}개에 조정값 붙여넣기",
@@ -741,10 +743,10 @@
     "border": {
       "addBorder": "테두리 추가",
       "aspectRatio": "종횡비",
-      "color": "색상",
+      "background": "배경",
       "cornerRadius": "테두리 반경",
       "originalRatio": "원본",
-      "width": "너비"
+      "spacing": "간격"
     },
     "bytes": {
       "bytes": "바이트",

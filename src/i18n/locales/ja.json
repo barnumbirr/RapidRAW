@@ -255,6 +255,8 @@
       "duplicateImage": "画像を複製",
       "exportImage_one": "画像を書き出し",
       "exportImage_other": "{{count}} 枚の画像を書き出し",
+      "frameImages_one": "画像にフレームを追加",
+      "frameImages_other": "画像にフレームを追加",
       "noAlbums": "利用可能なアルバムがありません",
       "pasteAdjustments_one": "補正設定を貼り付け",
       "pasteAdjustments_other": "{{count}} 枚の画像に補正設定を貼り付け",
@@ -741,10 +743,10 @@
     "border": {
       "addBorder": "枠を追加",
       "aspectRatio": "アスペクト比",
-      "color": "色",
+      "background": "背景",
       "cornerRadius": "角丸",
       "originalRatio": "オリジナル",
-      "width": "幅"
+      "spacing": "間隔"
     },
     "bytes": {
       "bytes": "バイト",

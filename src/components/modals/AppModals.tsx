@@ -322,6 +322,7 @@ export default function AppModals(props: AppModalsProps) {
         onSave={props.handleSaveCollage}
         sourceImages={collageModalState.sourceImages}
         thumbnails={thumbnails}
+        frameMode={collageModalState.frameMode ?? false}
       />
     </>
   );

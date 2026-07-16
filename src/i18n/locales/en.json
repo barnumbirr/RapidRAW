@@ -255,6 +255,8 @@
       "duplicateImage": "Duplicate Image",
       "exportImage_one": "Export Image",
       "exportImage_other": "Export {{count}} Images",
+      "frameImages_one": "Frame Image",
+      "frameImages_other": "Frame Images",
       "noAlbums": "No Albums Available",
       "pasteAdjustments_one": "Paste Adjustments",
       "pasteAdjustments_other": "Paste Adjustments to {{count}} Images",
@@ -743,10 +745,10 @@
     "border": {
       "addBorder": "Add Border",
       "aspectRatio": "Aspect Ratio",
-      "color": "Color",
+      "background": "Background",
       "cornerRadius": "Border Radius",
       "originalRatio": "Original",
-      "width": "Width"
+      "spacing": "Spacing"
     },
     "bytes": {
       "bytes": "Bytes",

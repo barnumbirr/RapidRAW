@@ -245,8 +245,8 @@ export default function ExportPanel({
     setWatermarkOpacity,
     enableBorder,
     setEnableBorder,
-    borderWidth,
-    setBorderWidth,
+    borderSpacing,
+    setBorderSpacing,
     borderColor,
     setBorderColor,
     borderCornerRadius,
@@ -420,7 +420,7 @@ export default function ExportPanel({
           : null,
       border: enableBorder
         ? {
-            width: borderWidth,
+            spacing: borderSpacing,
             color: borderColor,
             cornerRadius: borderCornerRadius,
             aspectRatio: BORDER_ASPECT_RATIOS[borderAspectRatio] ?? null,
@@ -461,7 +461,7 @@ export default function ExportPanel({
     watermarkSpacing,
     watermarkOpacity,
     enableBorder,
-    borderWidth,
+    borderSpacing,
     borderColor,
     borderCornerRadius,
     borderAspectRatio,
@@ -519,7 +519,7 @@ export default function ExportPanel({
           : null,
       border: enableBorder
         ? {
-            width: borderWidth,
+            spacing: borderSpacing,
             color: borderColor,
             cornerRadius: borderCornerRadius,
             aspectRatio: BORDER_ASPECT_RATIOS[borderAspectRatio] ?? null,
@@ -849,13 +849,13 @@ export default function ExportPanel({
                     <div className="space-y-4 pl-2 border-l-2 border-surface">
                       <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
                         <Slider
-                          label={t('export.border.width')}
+                          label={t('export.border.spacing')}
                           min={0}
-                          max={25}
+                          max={50}
                           step={1}
-                          value={borderWidth}
-                          onChange={(e) => setBorderWidth(Number(e.target.value))}
-                          defaultValue={3}
+                          value={borderSpacing}
+                          onChange={(e) => setBorderSpacing(Number(e.target.value))}
+                          defaultValue={15}
                         />
                         <Slider
                           label={t('export.border.cornerRadius')}
@@ -881,7 +881,7 @@ export default function ExportPanel({
                       </div>
                       <div>
                         <Text variant={TextVariants.label} className="mb-1 block">
-                          {t('export.border.color')}
+                          {t('export.border.background')}
                         </Text>
                         <div className="flex items-center gap-2 bg-surface p-2 rounded-md">
                           <input
