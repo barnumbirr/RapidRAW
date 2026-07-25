@@ -186,6 +186,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages, fr
           setExportHeight(Math.round(DEFAULT_EXPORT_WIDTH / ratio));
         }
         setLoadedImages(results);
+        setFrameIndex(0);
 
         const initialStates: Record<string, ImageState> = {};
         results.forEach((img) => {
@@ -396,7 +397,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages, fr
       setActiveAspectRatio({ id: 'original', name: t('modals.collage.original'), value: ratio });
       setExportHeight(Math.round(exportWidth / ratio));
     }
-  }, [frameIndex, frameMode, isLoading]);
+  }, [frameIndex, frameMode, isLoading, loadedImages]);
 
   const handleOriginalAspectRatio = () => {
     if (displayImages.length === 0) return;
@@ -935,7 +936,10 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages, fr
                     alt=""
                     onMouseDown={
                       frameMode
-                        ? () => setFrameIndex(loadedIndex)
+                        ? () => {
+                            setPanningImage(null);
+                            setFrameIndex(loadedIndex);
+                          }
                         : (e) => handleThumbnailMouseDown(e, sourceImg.path, loadedData.url)
                     }
                     className={clsx(

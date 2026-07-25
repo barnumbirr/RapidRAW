@@ -292,6 +292,11 @@ fn for_each_corner_pixel(
 fn apply_border(image: DynamicImage, border: &BorderSettings) -> Result<DynamicImage, String> {
     let [red, green, blue] = parse_hex_color(&border.color)
         .ok_or_else(|| format!("Invalid border color: '{}'", border.color))?;
+    if !border.spacing.is_finite() || !border.corner_radius.is_finite() {
+        return Err(
+            "Invalid border settings: spacing and corner radius must be finite".to_string(),
+        );
+    }
 
     let (img_w, img_h) = image.dimensions();
     if img_w == 0 || img_h == 0 {
@@ -309,11 +314,14 @@ fn apply_border(image: DynamicImage, border: &BorderSettings) -> Result<DynamicI
     if canvas_w == img_w && canvas_h == img_h && radius < 1.0 {
         return Ok(image);
     }
+    // Integer centering may leave a 1px asymmetry for odd gaps, matching the
+    // collage modal's own rounding.
     let offset_x = (canvas_w - img_w) / 2;
     let offset_y = (canvas_h - img_h) / 2;
 
-    // The GPU pipeline hands us Rgb32F images; composite in f32 to preserve
-    // bit depth for PNG/TIFF exports. Anything else goes through the u8 path.
+    // The GPU pipeline currently hands us Rgba8 frames, which take the u8
+    // path below. The Rgb32F branch preserves bit depth for float frames,
+    // mirroring the defensive Rgb32F handling in encode_image_to_bytes.
     if image.as_rgb32f().is_some() {
         let color = Rgb([
             red as f32 / 255.0,
@@ -2007,6 +2015,12 @@ mod tests {
         )
         .unwrap();
         assert!(settings.border.is_none());
+    }
+
+    #[test]
+    fn apply_border_rejects_non_finite_settings() {
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(10, 10, Rgb([0, 0, 0])));
+        assert!(apply_border(image, &border(f32::NAN, 0.0, None)).is_err());
     }
 
     #[test]
