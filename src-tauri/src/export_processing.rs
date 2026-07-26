@@ -303,13 +303,6 @@ fn apply_border(image: DynamicImage, border: &BorderSettings) -> Result<DynamicI
         return Ok(image);
     }
     let (canvas_w, canvas_h) = framed_canvas_size(img_w, img_h, border);
-    let inset = border_spacing_fraction(border) * canvas_w as f32;
-    let cell = (
-        inset,
-        inset,
-        canvas_w as f32 - inset,
-        canvas_h as f32 - inset,
-    );
     let radius = (border.corner_radius.clamp(0.0, 500.0) / 1000.0) * canvas_w as f32;
     if canvas_w == img_w && canvas_h == img_h && radius < 1.0 {
         return Ok(image);
@@ -318,6 +311,15 @@ fn apply_border(image: DynamicImage, border: &BorderSettings) -> Result<DynamicI
     // collage modal's own rounding.
     let offset_x = (canvas_w - img_w) / 2;
     let offset_y = (canvas_h - img_h) / 2;
+    // Round the photo's own corners. The spacing-inset rectangle is only as
+    // tall as the contain-fit allows, so rounding it would carve empty
+    // background on the letterboxed axis instead of the photo.
+    let cell = (
+        offset_x as f32,
+        offset_y as f32,
+        (offset_x + img_w) as f32,
+        (offset_y + img_h) as f32,
+    );
 
     // The GPU pipeline currently hands us Rgba8 frames, which take the u8
     // path below. The Rgb32F branch preserves bit depth for float frames,
@@ -1513,6 +1515,7 @@ pub async fn run_headless_export(
         strip_gps: false,
         filename_template: None,
         watermark: None,
+        border: None,
         export_masks: false,
         preserve_folders: true,
     };
@@ -1977,18 +1980,23 @@ mod tests {
     }
 
     #[test]
-    fn apply_border_keeps_inset_image_corners_square() {
-        // With spacing, the rounded "cell" is inset; this landscape image sits
-        // well inside the cell's left/right edges (inset ~9.5px, radius
-        // ~2.4px), so its own corners stay intact - exactly like the collage
-        // modal's clipping.
+    fn apply_border_rounds_the_photo_not_the_inset_cell() {
+        // The photo contain-fits the spacing-inset rectangle, so it is
+        // letterboxed on one axis. The radius must follow the photo's own
+        // corners; rounding the inset rectangle would carve background.
         let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(200, 100, Rgb([0, 0, 0])));
-        let result = apply_border(image, &border(40.0, 10.0, None)).unwrap();
+        let result = apply_border(image, &border(40.0, 100.0, None)).unwrap();
         let rgb = result.to_rgb8();
         assert_eq!(rgb.dimensions(), (238, 119));
         let (ox, oy) = ((238 - 200) / 2, (119 - 100) / 2);
-        assert_eq!(rgb.get_pixel(ox, oy), &Rgb([0, 0, 0]));
-        assert_eq!(rgb.get_pixel(ox + 199, oy + 99), &Rgb([0, 0, 0]));
+        // Radius is 10% of the 238px canvas (~24px): the photo's corners fall
+        // outside the arc and take the border color.
+        assert_eq!(rgb.get_pixel(ox, oy), &Rgb([255, 255, 255]));
+        assert_eq!(rgb.get_pixel(ox + 199, oy + 99), &Rgb([255, 255, 255]));
+        // Edge midpoints and the centre stay photo.
+        assert_eq!(rgb.get_pixel(ox + 100, oy), &Rgb([0, 0, 0]));
+        assert_eq!(rgb.get_pixel(ox, oy + 50), &Rgb([0, 0, 0]));
+        assert_eq!(rgb.get_pixel(ox + 100, oy + 50), &Rgb([0, 0, 0]));
     }
 
     #[test]

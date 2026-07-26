@@ -322,11 +322,6 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages, fr
 
         if (cellFinalWidth <= 0 || cellFinalHeight <= 0) return;
 
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(cellFinalX, cellFinalY, cellFinalWidth, cellFinalHeight, scaledRadius);
-        ctx.clip();
-
         const imageState = imageStates[image.path] || { offsetX: 0, offsetY: 0, scale: 1 };
         const currentScale = imageState.scale || 1;
         const imageRatio = img.width / img.height;
@@ -359,6 +354,20 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages, fr
             drawY = cellFinalY + imageState.offsetY * exportScale;
           }
         }
+
+        // Round the corners of the visible photo, not of the cell: with "keep
+        // original aspect ratio" the image is letterboxed inside its cell, so
+        // clipping the cell would round empty background instead of the photo.
+        const clipX = Math.max(cellFinalX, drawX);
+        const clipY = Math.max(cellFinalY, drawY);
+        const clipWidth = Math.min(cellFinalX + cellFinalWidth, drawX + drawWidth) - clipX;
+        const clipHeight = Math.min(cellFinalY + cellFinalHeight, drawY + drawHeight) - clipY;
+        if (clipWidth <= 0 || clipHeight <= 0) return;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(clipX, clipY, clipWidth, clipHeight, scaledRadius);
+        ctx.clip();
 
         ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
         ctx.restore();
