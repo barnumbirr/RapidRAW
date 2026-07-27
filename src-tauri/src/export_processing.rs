@@ -3,12 +3,18 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, imageops};
-use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
+use image::{
+    DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgb, Rgb32FImage,
+    RgbImage, imageops,
+};
+use jxl_encoder::{
+    LosslessConfig, LossyConfig, PixelLayout,
+    api::{calibrated_jxl_quality, quality_to_distance},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::Emitter;
@@ -68,6 +74,8 @@ pub struct ExportSettings {
     pub filename_template: Option<String>,
     pub watermark: Option<WatermarkSettings>,
     #[serde(default)]
+    pub border: Option<BorderSettings>,
+    #[serde(default)]
     pub export_masks: bool,
     #[serde(default)]
     pub preserve_folders: bool,
@@ -95,6 +103,15 @@ pub struct WatermarkSettings {
     pub scale: f32,
     pub spacing: f32,
     pub opacity: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BorderSettings {
+    pub spacing: f32,
+    pub color: String,
+    pub corner_radius: f32,
+    pub aspect_ratio: Option<f32>,
 }
 
 fn apply_watermark(
@@ -156,6 +173,201 @@ fn apply_watermark(
     image::imageops::overlay(base_image, &final_watermark, x, y);
 
     Ok(())
+}
+
+fn parse_hex_color(hex: &str) -> Option<[u8; 3]> {
+    let hex = hex.trim().trim_start_matches('#');
+    if !hex.is_ascii() {
+        return None;
+    }
+    match hex.len() {
+        6 => Some([
+            u8::from_str_radix(&hex[0..2], 16).ok()?,
+            u8::from_str_radix(&hex[2..4], 16).ok()?,
+            u8::from_str_radix(&hex[4..6], 16).ok()?,
+        ]),
+        3 => {
+            let component = |i: usize| u8::from_str_radix(&hex[i..i + 1], 16).ok().map(|v| v * 17);
+            Some([component(0)?, component(1)?, component(2)?])
+        }
+        _ => None,
+    }
+}
+
+fn border_spacing_fraction(border: &BorderSettings) -> f32 {
+    // Spacing uses the collage modal's units: a fraction of the canvas width,
+    // where a value of 15 means 1.5% (15/1000). Clamped so the maths below
+    // always leaves room for the image.
+    border.spacing.clamp(0.0, 400.0) / 1000.0
+}
+
+/// Canvas size for framing an image, matching the collage modal's geometry:
+/// the image contain-fits into the canvas inset by `spacing/1000 * canvas
+/// width` on every side, and the canvas only ever grows towards the target
+/// aspect ratio so the image is never cropped.
+fn framed_canvas_size(width: u32, height: u32, border: &BorderSettings) -> (u32, u32) {
+    if width == 0 || height == 0 {
+        return (width, height);
+    }
+    let f = border_spacing_fraction(border);
+    let image_ratio = width as f32 / height as f32;
+    let ratio = border
+        .aspect_ratio
+        .filter(|r| *r > 0.0)
+        .unwrap_or(image_ratio);
+
+    // Candidate canvas widths where the image exactly touches the inset
+    // rectangle on one axis; the larger one satisfies both axes.
+    let width_bound = width as f32 / (1.0 - 2.0 * f);
+    let height_bound = height as f32 * ratio / (1.0 - 2.0 * f * ratio).max(0.05);
+    let canvas_w = width_bound.max(height_bound);
+    let canvas_h = canvas_w / ratio;
+
+    (
+        (canvas_w.round() as u32).max(width),
+        (canvas_h.round() as u32).max(height),
+    )
+}
+
+/// Calls `f(x, y, coverage)` for every image pixel whose coverage by the
+/// rounded inset rectangle (the collage modal's "cell") is below 1.0.
+/// Coordinates passed to `f` are image-relative.
+#[allow(clippy::too_many_arguments)]
+fn for_each_corner_pixel(
+    cell: (f32, f32, f32, f32),
+    radius: f32,
+    image_origin: (u32, u32),
+    image_size: (u32, u32),
+    mut f: impl FnMut(u32, u32, f32),
+) {
+    let (cell_x0, cell_y0, cell_x1, cell_y1) = cell;
+    let radius = radius
+        .min((cell_x1 - cell_x0) / 2.0)
+        .min((cell_y1 - cell_y0) / 2.0);
+    if radius < 1.0 {
+        return;
+    }
+    let (origin_x, origin_y) = image_origin;
+    let (img_w, img_h) = image_size;
+    let corners = [
+        (cell_x0, cell_y0, cell_x0 + radius, cell_y0 + radius),
+        (
+            cell_x1 - radius,
+            cell_y0,
+            cell_x1 - radius,
+            cell_y0 + radius,
+        ),
+        (
+            cell_x0,
+            cell_y1 - radius,
+            cell_x0 + radius,
+            cell_y1 - radius,
+        ),
+        (
+            cell_x1 - radius,
+            cell_y1 - radius,
+            cell_x1 - radius,
+            cell_y1 - radius,
+        ),
+    ];
+    for (region_x, region_y, center_x, center_y) in corners {
+        // Intersect the corner square with the image rectangle (canvas coords).
+        let x_start = (region_x.floor().max(origin_x as f32)) as u32;
+        let y_start = (region_y.floor().max(origin_y as f32)) as u32;
+        let x_end = ((region_x + radius).ceil() as u32).min(origin_x + img_w);
+        let y_end = ((region_y + radius).ceil() as u32).min(origin_y + img_h);
+        for y in y_start..y_end {
+            for x in x_start..x_end {
+                let dx = x as f32 + 0.5 - center_x;
+                let dy = y as f32 + 0.5 - center_y;
+                let coverage = (radius + 0.5 - (dx * dx + dy * dy).sqrt()).clamp(0.0, 1.0);
+                if coverage < 1.0 {
+                    f(x - origin_x, y - origin_y, coverage);
+                }
+            }
+        }
+    }
+}
+
+fn apply_border(image: DynamicImage, border: &BorderSettings) -> Result<DynamicImage, String> {
+    let [red, green, blue] = parse_hex_color(&border.color)
+        .ok_or_else(|| format!("Invalid border color: '{}'", border.color))?;
+    if !border.spacing.is_finite() || !border.corner_radius.is_finite() {
+        return Err(
+            "Invalid border settings: spacing and corner radius must be finite".to_string(),
+        );
+    }
+
+    let (img_w, img_h) = image.dimensions();
+    if img_w == 0 || img_h == 0 {
+        return Ok(image);
+    }
+    let (canvas_w, canvas_h) = framed_canvas_size(img_w, img_h, border);
+    let radius = (border.corner_radius.clamp(0.0, 500.0) / 1000.0) * canvas_w as f32;
+    if canvas_w == img_w && canvas_h == img_h && radius < 1.0 {
+        return Ok(image);
+    }
+    // Integer centering may leave a 1px asymmetry for odd gaps, matching the
+    // collage modal's own rounding.
+    let offset_x = (canvas_w - img_w) / 2;
+    let offset_y = (canvas_h - img_h) / 2;
+    // Round the photo's own corners. The spacing-inset rectangle is only as
+    // tall as the contain-fit allows, so rounding it would carve empty
+    // background on the letterboxed axis instead of the photo.
+    let cell = (
+        offset_x as f32,
+        offset_y as f32,
+        (offset_x + img_w) as f32,
+        (offset_y + img_h) as f32,
+    );
+
+    // The GPU pipeline currently hands us Rgba8 frames, which take the u8
+    // path below. The Rgb32F branch preserves bit depth for float frames,
+    // mirroring the defensive Rgb32F handling in encode_image_to_bytes.
+    if image.as_rgb32f().is_some() {
+        let color = Rgb([
+            red as f32 / 255.0,
+            green as f32 / 255.0,
+            blue as f32 / 255.0,
+        ]);
+        let source = image.into_rgb32f();
+        let mut canvas = Rgb32FImage::from_pixel(canvas_w, canvas_h, color);
+        imageops::replace(&mut canvas, &source, offset_x as i64, offset_y as i64);
+        for_each_corner_pixel(
+            cell,
+            radius,
+            (offset_x, offset_y),
+            (img_w, img_h),
+            |x, y, coverage| {
+                let src_pixel = source.get_pixel(x, y);
+                let out = canvas.get_pixel_mut(offset_x + x, offset_y + y);
+                for c in 0..3 {
+                    out.0[c] = color.0[c] + (src_pixel.0[c] - color.0[c]) * coverage;
+                }
+            },
+        );
+        Ok(DynamicImage::ImageRgb32F(canvas))
+    } else {
+        let color = Rgb([red, green, blue]);
+        let source = image.into_rgb8();
+        let mut canvas = RgbImage::from_pixel(canvas_w, canvas_h, color);
+        imageops::replace(&mut canvas, &source, offset_x as i64, offset_y as i64);
+        for_each_corner_pixel(
+            cell,
+            radius,
+            (offset_x, offset_y),
+            (img_w, img_h),
+            |x, y, coverage| {
+                let src_pixel = source.get_pixel(x, y);
+                let out = canvas.get_pixel_mut(offset_x + x, offset_y + y);
+                for c in 0..3 {
+                    let base = color.0[c] as f32;
+                    out.0[c] = (base + (src_pixel.0[c] as f32 - base) * coverage).round() as u8;
+                }
+            },
+        );
+        Ok(DynamicImage::ImageRgb8(canvas))
+    }
 }
 
 fn calculate_resize_target(
@@ -254,7 +466,7 @@ fn relative_export_dir_for_preserved_folders(
         })
 }
 
-fn apply_export_resize_and_watermark(
+fn apply_export_post_processing(
     mut image: DynamicImage,
     export_settings: &ExportSettings,
 ) -> Result<DynamicImage, String> {
@@ -270,7 +482,130 @@ fn apply_export_resize_and_watermark(
     if let Some(watermark_settings) = &export_settings.watermark {
         apply_watermark(&mut image, watermark_settings)?;
     }
+
+    if let Some(border_settings) = &export_settings.border {
+        image = apply_border(image, border_settings)?;
+    }
     Ok(image)
+}
+
+fn ensure_export_not_cancelled(cancellation_token: &AtomicBool) -> Result<(), String> {
+    if cancellation_token.load(Ordering::SeqCst) {
+        Err("Export cancelled".to_string())
+    } else {
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ExportCancellationRequest {
+    Requested,
+    AlreadyRequested,
+    NoActiveTask,
+}
+
+struct ExportTaskGuard {
+    task_token: Arc<Mutex<Option<Arc<AtomicBool>>>>,
+    cancellation_token: Arc<AtomicBool>,
+    app_handle: Option<tauri::AppHandle>,
+}
+
+impl ExportTaskGuard {
+    fn new(
+        task_token: Arc<Mutex<Option<Arc<AtomicBool>>>>,
+        cancellation_token: Arc<AtomicBool>,
+    ) -> Self {
+        Self {
+            task_token,
+            cancellation_token,
+            app_handle: None,
+        }
+    }
+
+    fn with_app_handle(
+        task_token: Arc<Mutex<Option<Arc<AtomicBool>>>>,
+        cancellation_token: Arc<AtomicBool>,
+        app_handle: tauri::AppHandle,
+    ) -> Self {
+        let mut guard = Self::new(task_token, cancellation_token);
+        guard.app_handle = Some(app_handle);
+        guard
+    }
+}
+
+fn register_export_task(
+    task_token: &Mutex<Option<Arc<AtomicBool>>>,
+) -> Result<Arc<AtomicBool>, String> {
+    let mut active_token = task_token.lock().unwrap();
+    if active_token.is_some() {
+        return Err("An export is already in progress.".to_string());
+    }
+
+    let cancellation_token = Arc::new(AtomicBool::new(false));
+    *active_token = Some(Arc::clone(&cancellation_token));
+    Ok(cancellation_token)
+}
+
+fn request_export_cancellation<F>(
+    task_token: &Mutex<Option<Arc<AtomicBool>>>,
+    on_requested: F,
+) -> ExportCancellationRequest
+where
+    F: FnOnce(),
+{
+    let active_token = task_token.lock().unwrap();
+    let Some(cancellation_token) = active_token.as_ref() else {
+        return ExportCancellationRequest::NoActiveTask;
+    };
+
+    if cancellation_token.swap(true, Ordering::SeqCst) {
+        ExportCancellationRequest::AlreadyRequested
+    } else {
+        on_requested();
+        ExportCancellationRequest::Requested
+    }
+}
+
+fn finish_export_task<F>(
+    task_token: &Mutex<Option<Arc<AtomicBool>>>,
+    cancellation_token: &Arc<AtomicBool>,
+    on_finish: F,
+) -> bool
+where
+    F: FnOnce(bool),
+{
+    let mut active_token = task_token.lock().unwrap();
+    let Some(current_token) = active_token.as_ref() else {
+        return false;
+    };
+    if !Arc::ptr_eq(current_token, cancellation_token) {
+        return false;
+    }
+
+    let cancelled = cancellation_token.load(Ordering::SeqCst);
+    *active_token = None;
+
+    on_finish(cancelled);
+    true
+}
+
+impl Drop for ExportTaskGuard {
+    fn drop(&mut self) {
+        let app_handle = self.app_handle.clone();
+        let _ = finish_export_task(
+            &self.task_token,
+            &self.cancellation_token,
+            |cancelled| match (cancelled, app_handle) {
+                (true, Some(app_handle)) => {
+                    let _ = app_handle.emit("export-cancelled", ());
+                }
+                (false, Some(app_handle)) => {
+                    let _ = app_handle.emit("export-error", "Export task terminated unexpectedly");
+                }
+                _ => {}
+            },
+        );
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -420,7 +755,7 @@ fn process_image_for_export(
         app_handle,
     )?;
 
-    apply_export_resize_and_watermark(processed_image, export_settings)
+    apply_export_post_processing(processed_image, export_settings)
 }
 
 fn build_single_mask_adjustments(all: &AllAdjustments, mask_index: usize) -> AllAdjustments {
@@ -474,8 +809,8 @@ fn encode_image_to_bytes(
                         .map_err(|e| format!("Failed to encode lossless JXL: {}", e))?
                 }
             } else {
-                let distance = (100.0 - jpeg_quality as f32) / 10.0;
-                let distance = distance.max(0.01);
+                let jxl_quality = calibrated_jxl_quality(jpeg_quality as f32);
+                let distance = quality_to_distance(jxl_quality);
 
                 if has_alpha {
                     let rgba = image.to_rgba8();
@@ -542,9 +877,12 @@ fn export_masks_for_image(
     state: &tauri::State<AppState>,
     is_raw: bool,
     app_handle: &tauri::AppHandle,
+    cancellation_token: &AtomicBool,
 ) -> Result<(), String> {
+    ensure_export_not_cancelled(cancellation_token)?;
     let (transformed_image, unscaled_crop_offset) =
         apply_all_transformations(Cow::Borrowed(base_image), js_adjustments);
+    ensure_export_not_cancelled(cancellation_token)?;
     let (img_w, img_h) = transformed_image.dimensions();
     let mask_definitions: Vec<MaskDefinition> = js_adjustments
         .get("masks")
@@ -552,19 +890,21 @@ fn export_masks_for_image(
         .unwrap_or_default();
 
     let warped_image = resolve_warped_image_for_masks(state, js_adjustments, &mask_definitions);
-    let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
-        .iter()
-        .filter_map(|def| {
-            generate_mask_bitmap(
-                def,
-                img_w,
-                img_h,
-                1.0,
-                unscaled_crop_offset,
-                warped_image.as_deref(),
-            )
-        })
-        .collect();
+    let mut mask_bitmaps = Vec::with_capacity(mask_definitions.len());
+    for definition in &mask_definitions {
+        ensure_export_not_cancelled(cancellation_token)?;
+        if let Some(bitmap) = generate_mask_bitmap(
+            definition,
+            img_w,
+            img_h,
+            1.0,
+            unscaled_crop_offset,
+            warped_image.as_deref(),
+        ) {
+            mask_bitmaps.push(bitmap);
+        }
+        ensure_export_not_cancelled(cancellation_token)?;
+    }
 
     if !mask_bitmaps.is_empty() {
         let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
@@ -583,6 +923,7 @@ fn export_masks_for_image(
             .unwrap_or("jpg");
 
         for (i, _) in mask_bitmaps.iter().enumerate() {
+            ensure_export_not_cancelled(cancellation_token)?;
             let single_adjustments = build_single_mask_adjustments(&all_adjustments, i);
             let full_white_mask = ImageBuffer::from_fn(img_w, img_h, |_, _| Luma([255u8]));
             let single_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = vec![full_white_mask];
@@ -600,8 +941,9 @@ fn export_masks_for_image(
                 },
                 "export_mask_image",
             )?;
+            ensure_export_not_cancelled(cancellation_token)?;
 
-            let with_options = apply_export_resize_and_watermark(processed, export_settings)?;
+            let with_options = apply_export_post_processing(processed, export_settings)?;
             let (out_w, out_h) = with_options.dimensions();
 
             let alpha_resized = imageops::resize(
@@ -610,6 +952,7 @@ fn export_masks_for_image(
                 out_h,
                 imageops::FilterType::Lanczos3,
             );
+            ensure_export_not_cancelled(cancellation_token)?;
 
             let mask_image_path =
                 output_dir.join(format!("{}_mask_{}_image.{}", stem, i, extension));
@@ -621,12 +964,14 @@ fn export_masks_for_image(
                 source_path_str,
                 export_settings,
             )?;
+            ensure_export_not_cancelled(cancellation_token)?;
 
             if export_settings.preserve_timestamps {
                 set_timestamps_from_exif(Path::new(source_path_str), &mask_image_path);
             }
 
             let alpha_bytes = encode_grayscale_to_png(&alpha_resized)?;
+            ensure_export_not_cancelled(cancellation_token)?;
             #[cfg(target_os = "android")]
             {
                 let file_name = mask_alpha_path
@@ -642,6 +987,7 @@ fn export_masks_for_image(
 
             #[cfg(not(target_os = "android"))]
             fs::write(&mask_alpha_path, alpha_bytes).map_err(|e| e.to_string())?;
+            ensure_export_not_cancelled(cancellation_token)?;
         }
     }
     Ok(())
@@ -653,7 +999,9 @@ fn export_adjustments_as_lut(
     context: &Arc<GpuContext>,
     state: &tauri::State<AppState>,
     app_handle: &tauri::AppHandle,
+    cancellation_token: &AtomicBool,
 ) -> Result<Vec<u8>, String> {
+    ensure_export_not_cancelled(cancellation_token)?;
     let lut_size = 33;
     let identity_image = generate_identity_lut_image(lut_size);
 
@@ -693,13 +1041,15 @@ fn export_adjustments_as_lut(
         },
         "export_lut",
     )?;
+    ensure_export_not_cancelled(cancellation_token)?;
 
-    convert_image_to_cube_lut(&processed_lut, lut_size)
+    let cube_lut = convert_image_to_cube_lut(&processed_lut, lut_size)?;
+    ensure_export_not_cancelled(cancellation_token)?;
+    Ok(cube_lut)
 }
 
 #[allow(clippy::too_many_arguments)]
-#[tauri::command]
-pub async fn export_images(
+pub(crate) async fn export_images_impl(
     paths: Vec<String>,
     output_folder_or_file: String,
     is_explicit_file_path: bool,
@@ -710,14 +1060,30 @@ pub async fn export_images(
     current_edit_adjustments: Option<Value>,
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
+    completion_tx: Option<tokio::sync::oneshot::Sender<Result<(), usize>>>,
 ) -> Result<(), String> {
+    let cancellation_token = register_export_task(&state.export_task_token)?;
+    let task_guard = ExportTaskGuard::with_app_handle(
+        Arc::clone(&state.export_task_token),
+        Arc::clone(&cancellation_token),
+        app_handle.clone(),
+    );
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 
-    if state.export_task_handle.lock().unwrap().is_some() {
-        return Err("An export is already in progress.".to_string());
+    if cancellation_token.load(Ordering::SeqCst) {
+        return Ok(());
     }
 
-    let context = get_or_init_gpu_context(&state, &app_handle)?;
+    let context = match get_or_init_gpu_context(&state, &app_handle) {
+        Ok(context) => context,
+        Err(_) if cancellation_token.load(Ordering::SeqCst) => return Ok(()),
+        Err(error) => return Err(error),
+    };
+
+    if cancellation_token.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+
     let context = Arc::new(context);
     let progress_counter = Arc::new(AtomicUsize::new(0));
 
@@ -729,13 +1095,12 @@ pub async fn export_images(
     sys.refresh_memory();
 
     let available_ram_gb = sys.available_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
-
-    let ram_based_limit = (available_ram_gb / 2.5).floor() as usize;
+    let ram_based_limit = (available_ram_gb / 4.0).floor() as usize;
 
     let num_threads = if paths.len() == 1 {
         1
     } else {
-        available_cores.min(ram_based_limit).clamp(1, 16)
+        available_cores.min(ram_based_limit).clamp(1, 4)
     };
 
     log::info!(
@@ -745,7 +1110,8 @@ pub async fn export_images(
         num_threads
     );
 
-    let task = tokio::spawn(async move {
+    let _export_task = tokio::spawn(async move {
+        let _task_guard = task_guard;
         let output_folder_path = std::path::Path::new(&output_folder_or_file);
         let total_paths = paths.len();
         let settings = load_settings(app_handle.clone()).unwrap_or_default();
@@ -785,7 +1151,14 @@ pub async fn export_images(
         let mut join_handles = Vec::new();
 
         for (global_index, image_path_str, appearance_count, explicit_vc) in export_items {
+            if cancellation_token.load(Ordering::SeqCst) {
+                break;
+            }
             let permit = semaphore.clone().acquire_owned().await.unwrap();
+            if cancellation_token.load(Ordering::SeqCst) {
+                drop(permit);
+                break;
+            }
 
             let app_handle_clone = app_handle.clone();
             let context_clone = Arc::clone(&context);
@@ -797,29 +1170,24 @@ pub async fn export_images(
             let current_edit_path = current_edit_path.clone();
             let current_edit_adjustments = current_edit_adjustments.clone();
             let settings = settings.clone();
+            let cancellation_token_clone = Arc::clone(&cancellation_token);
 
             let handle = tokio::task::spawn_blocking(move || {
-                if app_handle_clone
-                    .state::<AppState>()
-                    .export_task_handle
-                    .lock()
-                    .unwrap()
-                    .is_none()
-                {
-                    return Err("Export cancelled".to_string());
-                }
+                ensure_export_not_cancelled(&cancellation_token_clone)?;
 
                 let state = app_handle_clone.state::<AppState>();
                 let (source_path, sidecar_path) = parse_virtual_path(&image_path_str);
                 let source_path_str = source_path.to_string_lossy().to_string();
                 let is_current_edit = Some(&source_path_str) == current_edit_path.as_ref();
 
-                let mut js_adjustments = match (is_current_edit, current_edit_adjustments) {
-                    (true, Some(adjustments)) => adjustments,
-                    _ => {
-                        let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-                        metadata.adjustments
+                let mut js_adjustments = if let Some(ref adj) = current_edit_adjustments {
+                    if is_current_edit || current_edit_path.is_none() {
+                        adj.clone()
+                    } else {
+                        crate::exif_processing::load_sidecar(&sidecar_path).adjustments
                     }
+                } else {
+                    crate::exif_processing::load_sidecar(&sidecar_path).adjustments
                 };
 
                 hydrate_adjustments(&state, &mut js_adjustments);
@@ -876,7 +1244,9 @@ pub async fn export_images(
                             &context_clone,
                             &state,
                             &app_handle_clone,
+                            &cancellation_token_clone,
                         )?;
+                        ensure_export_not_cancelled(&cancellation_token_clone)?;
                         #[cfg(target_os = "android")]
                         {
                             let file_name = output_path
@@ -891,6 +1261,7 @@ pub async fn export_images(
                         }
                         #[cfg(not(target_os = "android"))]
                         fs::write(&output_path, cube_bytes).map_err(|e| e.to_string())?;
+                        ensure_export_not_cancelled(&cancellation_token_clone)?;
                         return Ok(());
                     }
 
@@ -940,6 +1311,7 @@ pub async fn export_images(
                             }
                         }
                     };
+                    ensure_export_not_cancelled(&cancellation_token_clone)?;
 
                     let mut main_export_adjustments = js_adjustments.clone();
                     if export_settings.export_masks
@@ -958,16 +1330,19 @@ pub async fn export_images(
                         is_raw,
                         &app_handle_clone,
                     )?;
+                    ensure_export_not_cancelled(&cancellation_token_clone)?;
                     save_image_with_metadata(
                         &final_image,
                         &output_path,
                         &source_path_str,
                         &export_settings,
                     )?;
+                    ensure_export_not_cancelled(&cancellation_token_clone)?;
 
                     if export_settings.preserve_timestamps {
                         set_timestamps_from_exif(Path::new(&source_path_str), &output_path);
                     }
+                    ensure_export_not_cancelled(&cancellation_token_clone)?;
 
                     if export_settings.export_masks {
                         export_masks_for_image(
@@ -980,24 +1355,32 @@ pub async fn export_images(
                             &state,
                             is_raw,
                             &app_handle_clone,
+                            &cancellation_token_clone,
                         )?;
                     }
 
                     Ok(())
                 })();
 
-                let current_progress = progress_counter_clone.fetch_add(1, Ordering::SeqCst) + 1;
-                let _ = app_handle_clone.emit(
-                    "batch-export-progress",
-                    serde_json::json!({
-                        "current": current_progress,
-                        "total": total_paths,
-                        "path": &image_path_str
-                    }),
-                );
+                if !cancellation_token_clone.load(Ordering::SeqCst) {
+                    let current_progress =
+                        progress_counter_clone.fetch_add(1, Ordering::SeqCst) + 1;
+                    let _ = app_handle_clone.emit(
+                        "batch-export-progress",
+                        serde_json::json!({
+                            "current": current_progress,
+                            "total": total_paths,
+                            "path": &image_path_str
+                        }),
+                    );
+                }
 
                 drop(permit);
-                result
+                if cancellation_token_clone.load(Ordering::SeqCst) {
+                    Err("Export cancelled".to_string())
+                } else {
+                    result
+                }
             });
 
             join_handles.push(handle);
@@ -1011,51 +1394,184 @@ pub async fn export_images(
             }
         }
 
-        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
-
-        let mut error_count = 0;
-        for result in results {
-            if let Err(e) = result {
-                error_count += 1;
-                log::error!("Export error: {}", e);
-                if total_paths == 1 {
-                    let _ = app_handle.emit("export-error", e);
+        let errors: Vec<String> = results.into_iter().filter_map(Result::err).collect();
+        let error_count = errors.len();
+        let export_state = app_handle.state::<AppState>();
+        let finalized = finish_export_task(
+            &export_state.export_task_token,
+            &cancellation_token,
+            |cancelled| {
+                if cancelled {
+                    log::info!("Batch export cancelled and worker cleanup completed");
+                    let _ = app_handle.emit("export-cancelled", ());
+                    return;
                 }
+
+                for error in &errors {
+                    log::error!("Export error: {}", error);
+                    if total_paths == 1 {
+                        let _ = app_handle.emit("export-error", error.clone());
+                    }
+                }
+
+                if error_count > 0 && total_paths > 1 {
+                    let _ = app_handle.emit(
+                        "export-error",
+                        format!("{error_count} of {total_paths} exports failed"),
+                    );
+                } else if error_count == 0 {
+                    let _ = app_handle.emit(
+                        "batch-export-progress",
+                        serde_json::json!({ "current": total_paths, "total": total_paths, "path": "" }),
+                    );
+                    let _ = app_handle.emit("export-complete", ());
+                }
+            },
+        );
+
+        if !finalized {
+            log::warn!("Ignoring terminal events from a stale export task");
+        }
+
+        if let Some(tx) = completion_tx {
+            if error_count > 0 {
+                let _ = tx.send(Err(error_count));
+            } else {
+                let _ = tx.send(Ok(()));
             }
         }
-
-        if error_count > 0 && total_paths > 1 {
-            let _ = app_handle.emit(
-                "export-complete-with-errors",
-                serde_json::json!({ "errors": error_count, "total": total_paths }),
-            );
-        } else if error_count == 0 {
-            let _ = app_handle.emit(
-                "batch-export-progress",
-                serde_json::json!({ "current": total_paths, "total": total_paths, "path": "" }),
-            );
-            let _ = app_handle.emit("export-complete", ());
-        }
-
-        *app_handle
-            .state::<AppState>()
-            .export_task_handle
-            .lock()
-            .unwrap() = None;
     });
 
-    *state.export_task_handle.lock().unwrap() = Some(task);
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
-pub fn cancel_export(state: tauri::State<AppState>) -> Result<(), String> {
-    match state.export_task_handle.lock().unwrap().take() {
-        Some(handle) => {
-            handle.abort();
-            println!("Export task cancellation requested.");
+pub async fn export_images(
+    paths: Vec<String>,
+    output_folder_or_file: String,
+    is_explicit_file_path: bool,
+    base_origin_folders: Vec<String>,
+    export_settings: ExportSettings,
+    output_format: String,
+    current_edit_path: Option<String>,
+    current_edit_adjustments: Option<Value>,
+    state: tauri::State<'_, AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    export_images_impl(
+        paths,
+        output_folder_or_file,
+        is_explicit_file_path,
+        base_origin_folders,
+        export_settings,
+        output_format,
+        current_edit_path,
+        current_edit_adjustments,
+        state,
+        app_handle,
+        None,
+    )
+    .await
+}
+
+pub async fn run_headless_export(
+    session: crate::launch_request::HeadlessExportSession,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    println!("Starting headless export...");
+    let state = app_handle.state::<crate::AppState>();
+
+    let source_path = std::path::Path::new(&session.source);
+    if !source_path.exists() {
+        return Err(format!("Source path does not exist: {}", session.source));
+    }
+
+    std::fs::create_dir_all(&session.output)
+        .map_err(|e| format!("Failed to create output directory: {}", e))?;
+
+    let mut paths = Vec::new();
+    if source_path.is_dir() {
+        let images = crate::file_management::list_images_recursive(
+            session.source.clone(),
+            app_handle.clone(),
+        )?;
+        paths = images.into_iter().map(|img| img.path).collect();
+    } else {
+        paths.push(session.source.clone());
+    }
+
+    if paths.is_empty() {
+        return Err("No supported images found at the source path.".to_string());
+    }
+
+    println!("Found {} images to export. Processing...", paths.len());
+
+    let export_settings = ExportSettings {
+        jpeg_quality: session.quality,
+        resize: None,
+        keep_metadata: session.keep_metadata,
+        preserve_timestamps: true,
+        strip_gps: false,
+        filename_template: None,
+        watermark: None,
+        border: None,
+        export_masks: false,
+        preserve_folders: true,
+    };
+
+    let mut custom_adjustments = None;
+    if let Some(adj_path) = &session.adjustments_override {
+        let content = std::fs::read_to_string(adj_path)
+            .map_err(|e| format!("Failed to read adjustments file: {}", e))?;
+        let json: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse adjustments JSON: {}", e))?;
+        custom_adjustments = Some(json);
+        println!(
+            "Loaded custom adjustments to override sidecars from: {}",
+            adj_path
+        );
+    }
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+
+    export_images_impl(
+        paths,
+        session.output,
+        false,
+        vec![session.source],
+        export_settings,
+        session.format,
+        None,
+        custom_adjustments,
+        state.clone(),
+        app_handle.clone(),
+        Some(tx),
+    )
+    .await?;
+
+    match rx.await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(errors)) => Err(format!("Export completed with {} errors.", errors)),
+        Err(_) => Err("Export task panicked or was cancelled.".to_string()),
+    }
+}
+
+#[tauri::command]
+pub fn cancel_export(
+    state: tauri::State<AppState>,
+    app_handle: tauri::AppHandle,
+) -> Result<(), String> {
+    match request_export_cancellation(&state.export_task_token, || {
+        let _ = app_handle.emit("export-cancelling", ());
+    }) {
+        ExportCancellationRequest::Requested => {
+            log::info!("Export cancellation requested; workers will stop at the next checkpoint");
         }
-        _ => {
+        ExportCancellationRequest::AlreadyRequested => {
+            log::info!("Export cancellation was already requested");
+        }
+        ExportCancellationRequest::NoActiveTask => {
             return Err("No export task is currently running.".to_string());
         }
     }
@@ -1196,6 +1712,10 @@ pub async fn estimate_export_sizes(
         } else {
             (full_w, full_h)
         };
+        let (final_full_w, final_full_h) = match &export_settings.border {
+            Some(border) => framed_canvas_size(final_full_w, final_full_h, border),
+            None => (final_full_w, final_full_h),
+        };
 
         let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
         let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
@@ -1333,6 +1853,10 @@ pub async fn estimate_export_sizes(
         } else {
             (full_w, full_h)
         };
+        let (final_full_w, final_full_h) = match &export_settings.border {
+            Some(border) => framed_canvas_size(final_full_w, final_full_h, border),
+            None => (final_full_w, final_full_h),
+        };
 
         let (processed_preview_w, processed_preview_h) = processed_preview.dimensions();
         let pixel_ratio = if processed_preview_w > 0 && processed_preview_h > 0 {
@@ -1346,4 +1870,181 @@ pub async fn estimate_export_sizes(
     };
 
     Ok(single_image_extrapolated_size * paths.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn border(spacing: f32, corner_radius: f32, aspect_ratio: Option<f32>) -> BorderSettings {
+        BorderSettings {
+            spacing,
+            color: "#FFFFFF".to_string(),
+            corner_radius,
+            aspect_ratio,
+        }
+    }
+
+    #[test]
+    fn parse_hex_color_accepts_six_and_three_digit_forms() {
+        assert_eq!(parse_hex_color("#FFFFFF"), Some([255, 255, 255]));
+        assert_eq!(parse_hex_color("#1a2b3c"), Some([26, 43, 60]));
+        assert_eq!(parse_hex_color("1a2b3c"), Some([26, 43, 60]));
+        assert_eq!(parse_hex_color("#fff"), Some([255, 255, 255]));
+        assert_eq!(parse_hex_color(" #000000 "), Some([0, 0, 0]));
+    }
+
+    #[test]
+    fn parse_hex_color_rejects_malformed_input() {
+        assert_eq!(parse_hex_color(""), None);
+        assert_eq!(parse_hex_color("#12345"), None);
+        assert_eq!(parse_hex_color("#gggggg"), None);
+        assert_eq!(
+            parse_hex_color("#\u{e9}\u{e9}\u{e9}\u{e9}\u{e9}\u{e9}"),
+            None
+        );
+    }
+
+    #[test]
+    fn framed_canvas_matches_collage_modal_geometry() {
+        // Landscape 2:1 at spacing 15 (1.5% of canvas width): the height is
+        // the binding axis, giving a canvas of 2128x1064 with a vertical gap
+        // of exactly spacing and a horizontal gap of ratio * spacing - the
+        // same contain-fit the collage modal produces.
+        assert_eq!(
+            framed_canvas_size(2000, 1000, &border(15.0, 0.0, None)),
+            (2128, 1064)
+        );
+        // Portrait: the width binds instead.
+        assert_eq!(
+            framed_canvas_size(1000, 1500, &border(15.0, 0.0, None)),
+            (1031, 1546)
+        );
+        // No spacing, no ratio: no-op.
+        assert_eq!(
+            framed_canvas_size(2000, 1000, &border(0.0, 0.0, None)),
+            (2000, 1000)
+        );
+    }
+
+    #[test]
+    fn framed_canvas_pads_to_target_ratio_without_cropping() {
+        // Landscape image padded to a square canvas: height grows to match width.
+        assert_eq!(
+            framed_canvas_size(2000, 1000, &border(0.0, 0.0, Some(1.0))),
+            (2000, 2000)
+        );
+        // Portrait target on a landscape image: the canvas only ever grows.
+        let (w, h) = framed_canvas_size(2000, 1000, &border(0.0, 0.0, Some(4.0 / 5.0)));
+        assert!(w >= 2000 && h >= 1000);
+        assert!((w as f32 / h as f32 - 0.8).abs() < 0.01);
+    }
+
+    #[test]
+    fn apply_border_wraps_image_in_solid_color() {
+        // Square image, spacing 100 (10% of canvas width per side): canvas is
+        // 125x125 with the image centered at (12,12)..(112,112).
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(100, 100, Rgb([10, 20, 30])));
+        let result = apply_border(image, &border(100.0, 0.0, None)).unwrap();
+        assert_eq!(result.dimensions(), (125, 125));
+        let rgb = result.to_rgb8();
+        assert_eq!(rgb.get_pixel(0, 0), &Rgb([255, 255, 255]));
+        assert_eq!(rgb.get_pixel(62, 62), &Rgb([10, 20, 30]));
+        assert_eq!(rgb.get_pixel(13, 13), &Rgb([10, 20, 30]));
+        assert_eq!(rgb.get_pixel(5, 5), &Rgb([255, 255, 255]));
+    }
+
+    #[test]
+    fn apply_border_preserves_f32_pipeline_images() {
+        let image =
+            DynamicImage::ImageRgb32F(Rgb32FImage::from_pixel(100, 50, Rgb([0.5, 0.5, 0.5])));
+        let result = apply_border(image, &border(100.0, 0.0, None)).unwrap();
+        assert!(matches!(result, DynamicImage::ImageRgb32F(_)));
+        assert!(result.dimensions().0 > 100 && result.dimensions().1 > 50);
+    }
+
+    #[test]
+    fn apply_border_rounds_corners_with_border_color() {
+        // No spacing: the cell is the whole canvas, so the corner arcs clip
+        // the image itself. Radius 200 = 20% of the 100px canvas = 20px.
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(100, 100, Rgb([0, 0, 0])));
+        let result = apply_border(image, &border(0.0, 200.0, None)).unwrap();
+        assert_eq!(result.dimensions(), (100, 100));
+        let rgb = result.to_rgb8();
+        // The image corner sits outside the 20px arc and takes the fill color.
+        assert_eq!(rgb.get_pixel(0, 0), &Rgb([255, 255, 255]));
+        assert_eq!(rgb.get_pixel(99, 0), &Rgb([255, 255, 255]));
+        // Edge midpoints and the center are untouched.
+        assert_eq!(rgb.get_pixel(50, 0), &Rgb([0, 0, 0]));
+        assert_eq!(rgb.get_pixel(50, 50), &Rgb([0, 0, 0]));
+    }
+
+    #[test]
+    fn apply_border_rounds_the_photo_not_the_inset_cell() {
+        // The photo contain-fits the spacing-inset rectangle, so it is
+        // letterboxed on one axis. The radius must follow the photo's own
+        // corners; rounding the inset rectangle would carve background.
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(200, 100, Rgb([0, 0, 0])));
+        let result = apply_border(image, &border(40.0, 100.0, None)).unwrap();
+        let rgb = result.to_rgb8();
+        assert_eq!(rgb.dimensions(), (238, 119));
+        let (ox, oy) = ((238 - 200) / 2, (119 - 100) / 2);
+        // Radius is 10% of the 238px canvas (~24px): the photo's corners fall
+        // outside the arc and take the border color.
+        assert_eq!(rgb.get_pixel(ox, oy), &Rgb([255, 255, 255]));
+        assert_eq!(rgb.get_pixel(ox + 199, oy + 99), &Rgb([255, 255, 255]));
+        // Edge midpoints and the centre stay photo.
+        assert_eq!(rgb.get_pixel(ox + 100, oy), &Rgb([0, 0, 0]));
+        assert_eq!(rgb.get_pixel(ox, oy + 50), &Rgb([0, 0, 0]));
+        assert_eq!(rgb.get_pixel(ox + 100, oy + 50), &Rgb([0, 0, 0]));
+    }
+
+    #[test]
+    fn border_settings_deserialize_from_frontend_payload() {
+        // Pin the wire format the export panel sends (camelCase keys).
+        let parsed: BorderSettings = serde_json::from_str(
+            r##"{"spacing":15.0,"color":"#FFFFFF","cornerRadius":10.0,"aspectRatio":0.8}"##,
+        )
+        .unwrap();
+        assert_eq!(parsed.spacing, 15.0);
+        assert_eq!(parsed.corner_radius, 10.0);
+        assert_eq!(parsed.aspect_ratio, Some(0.8));
+
+        let no_ratio: BorderSettings = serde_json::from_str(
+            r##"{"spacing":0.0,"color":"#000","cornerRadius":0.0,"aspectRatio":null}"##,
+        )
+        .unwrap();
+        assert_eq!(no_ratio.aspect_ratio, None);
+
+        // Payloads and saved presets that predate the border feature must
+        // keep deserializing, with the border defaulting to None.
+        let settings: ExportSettings = serde_json::from_str(
+            r#"{"jpegQuality":90,"resize":null,"keepMetadata":true,"stripGps":true,"filenameTemplate":null,"watermark":null}"#,
+        )
+        .unwrap();
+        assert!(settings.border.is_none());
+    }
+
+    #[test]
+    fn apply_border_rejects_non_finite_settings() {
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(10, 10, Rgb([0, 0, 0])));
+        assert!(apply_border(image, &border(f32::NAN, 0.0, None)).is_err());
+    }
+
+    #[test]
+    fn apply_border_rejects_invalid_color() {
+        let image = DynamicImage::ImageRgb8(RgbImage::from_pixel(10, 10, Rgb([0, 0, 0])));
+        assert!(
+            apply_border(
+                image,
+                &BorderSettings {
+                    spacing: 5.0,
+                    color: "not-a-color".to_string(),
+                    corner_radius: 0.0,
+                    aspect_ratio: None,
+                }
+            )
+            .is_err()
+        );
+    }
 }

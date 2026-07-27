@@ -112,11 +112,18 @@
     },
     "effects": {
       "amount": "양",
+      "bokehCircular": "원형",
+      "bokehHexagonal": "육각형",
+      "bokehOctagonal": "팔각형",
+      "bokehRing": "버블 (링)",
+      "bokehShape": "보케 모양",
       "creative": "크리에이티브",
       "feather": "페더",
       "glow": "글로우",
       "grain": "그레인",
       "halation": "헐레이션",
+      "lensBlur": "렌즈 블러",
+      "lensDiffusion": "확산",
       "lightFlares": "빛 번짐",
       "lut": "LUT",
       "midpoint": "중간점",
@@ -248,6 +255,8 @@
       "duplicateImage": "이미지 복제",
       "exportImage_one": "이미지 내보내기",
       "exportImage_other": "이미지 {{count}}개 내보내기",
+      "frameImages_one": "이미지 프레임",
+      "frameImages_other": "이미지 프레임",
       "noAlbums": "사용 가능한 앨범 없음",
       "pasteAdjustments_one": "조정값 붙여넣기",
       "pasteAdjustments_other": "이미지 {{count}}개에 조정값 붙여넣기",
@@ -352,6 +361,7 @@
       "dropzoneText": "여기에 놓아 새 편집을 만드세요",
       "editSettingsTitle": "편집 설정",
       "editsTitle": "편집",
+      "generatingDepthMap": "AI 심도 맵 계산 중...",
       "generativeEditTitle": "생성형 편집",
       "inpaintingTitle": "인페인팅",
       "manualCleanupTitle": "수동 정리",
@@ -365,7 +375,9 @@
         "aiEdit_one": "AI 편집 {{count}}",
         "aiEdit_other": "AI 편집 {{count}}",
         "clone": "복제 {{count}}",
+        "clone_other": "복제 {{count}}",
         "heal": "복구 {{count}}",
+        "heal_other": "복구 {{count}}",
         "invertedName": "{{name}} 반전됨",
         "quickErase": "빠른 지우기 {{count}}",
         "quickErase_one": "빠른 지우기 {{count}}",
@@ -705,6 +717,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "조리개",
         "backToLibrary": "라이브러리로 돌아가기",
@@ -726,6 +739,14 @@
       "preserveFolders": "폴더 구조 유지",
       "preserveTimestamps": "EXIF 촬영 날짜로 파일 타임스탬프 설정",
       "title": "내보내기 설정"
+    },
+    "border": {
+      "addBorder": "테두리 추가",
+      "aspectRatio": "종횡비",
+      "background": "배경",
+      "cornerRadius": "테두리 반경",
+      "originalRatio": "원본",
+      "spacing": "간격"
     },
     "bytes": {
       "bytes": "바이트",
@@ -767,6 +788,7 @@
     },
     "sections": {
       "advanced": "고급",
+      "border": "테두리",
       "fileNaming": "파일 이름 지정",
       "fileSettings": "파일 설정",
       "imageSizing": "이미지 크기",
@@ -776,6 +798,7 @@
     "status": {
       "cancelExport": "내보내기 취소",
       "cancelled": "내보내기가 취소되었습니다",
+      "cancelling": "내보내기 취소 중…",
       "estimatedAverageSize": " ({{size}} 평균)",
       "estimatedSize": "예상 파일 크기: ~{{size}}",
       "estimatedTotalSize": "예상 총 크기: ~{{size}}",
@@ -830,6 +853,31 @@
         "name": "이름 (가나다순)"
       }
     },
+    "culling": {
+      "addTagPlaceholder": "태그 추가...",
+      "altCullingPreviewHighRes": "고해상도 선별 미리보기",
+      "altThumbnailLoading": "썸네일 로딩 중",
+      "aperture": "조리개",
+      "cameraSettings": "카메라 설정",
+      "clickThumbnailsHint": "비교 뷰에 추가하려면 오른쪽 사이드바에서 썸네일을 클릭하세요.",
+      "colorLabel": "색상 라벨",
+      "dimensions": "크기",
+      "editImage": "이미지 편집",
+      "focalLength": "초점 거리",
+      "iso": "ISO",
+      "metadata": "메타데이터",
+      "noMetadataAvailable": "메타데이터 없음",
+      "noTagsAdded": "추가된 태그 없음",
+      "none": "없음",
+      "rateAndLabel": "평가 및 라벨",
+      "rating": "평가",
+      "selectImagesToCompare": "비교할 이미지 선택",
+      "shutterSpeed": "셔터 속도",
+      "syncZoomAndPan": "줌 및 이동 동기화",
+      "tags": "태그",
+      "toggleFit": "1:1 / 맞춤 전환",
+      "vc": "VC"
+    },
     "filters": {
       "edited": {
         "all": "모든 이미지",
@@ -851,7 +899,6 @@
       "raw": {
         "all": "모든 유형",
         "nonRawOnly": "RAW가 아닌 항목만",
-        "preferRaw": "RAW 우선",
         "rawOnly": "RAW만"
       }
     },
@@ -915,6 +962,12 @@
         "filterByEdited": "편집 상태로 필터링",
         "filterByFileType": "파일 유형으로 필터링",
         "filterByRating": "평점으로 필터링",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
+        "groupOff": "Off",
+        "groupPreferJpeg": "Prefer JPEG",
+        "groupPreferRaw": "Prefer RAW",
+        "groupRawJpeg": "Group RAW + JPEG",
         "metadataAlways": "항상",
         "metadataHover": "마우스 오버 시",
         "metadataOff": "끄기",
@@ -1072,6 +1125,9 @@
       "confirm": "확인"
     },
     "copyPaste": {
+      "autoSyncDesc": "선택한 모든 이미지에 조정을 자동으로 적용합니다.",
+      "autoSyncLabel": "자동 동기화 활성화",
+      "autoSyncTitle": "조정 자동 동기화",
       "cancel": "취소",
       "descMerge": "복사한 변경 사항을 추가하며 다른 설정은 그대로 둡니다.",
       "descReplace": "선택한 모든 설정을 덮어쓰고 나머지는 기본값으로 초기화합니다.",
@@ -1451,7 +1507,9 @@
         "copy_files": "선택한 파일 복사",
         "cycle_zoom": "확대/축소 순환 (맞춤, 2배 맞춤, 100%)",
         "delete_selected": "선택한 파일 삭제",
+        "focus_search": "검색창에 포커스",
         "open_image": "선택한 이미지 열기",
+        "open_settings": "설정 열기",
         "paste_adjustments": "복사한 조정값 붙여넣기",
         "paste_files": "현재 폴더에 파일 붙여넣기",
         "preview_next": "다음 이미지",

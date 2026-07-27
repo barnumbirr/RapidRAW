@@ -3,12 +3,13 @@ import { Image as ImageIcon, Star, SlidersHorizontal } from 'lucide-react';
 import clsx from 'clsx';
 import { Grid, useGridCallbackRef } from 'react-window';
 import { useTranslation } from 'react-i18next';
-import { ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
+import { ImageFile, SelectedImage, ThumbnailAspectRatio, GroupingMode } from '../ui/AppProperties';
 import { Color, COLOR_LABELS } from '../../utils/adjustments';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
+import { useLibraryStore } from '../../store/useLibraryStore';
 
 const HORIZONTAL_PADDING = 4;
 const ITEM_GAP = 8;
@@ -506,14 +507,6 @@ const FilmstripList = ({
     const currentPath = data.selectedPath;
 
     if (currentPath && gridHandle) {
-      if (data.multiSelectedPaths.length > 1) {
-        prevSelectedPath.current = currentPath;
-        if (data.clickTriggeredScroll.current) {
-          data.clickTriggeredScroll.current = false;
-        }
-        return;
-      }
-
       const index = data.imageList.findIndex((img) => img.path === currentPath);
 
       if (index !== -1) {
@@ -535,15 +528,7 @@ const FilmstripList = ({
         }
       }
     }
-  }, [
-    data.selectedPath,
-    data.multiSelectedPaths,
-    data.imageList,
-    isItemVisible,
-    data.clickTriggeredScroll,
-    performSafeScroll,
-    gridHandle,
-  ]);
+  }, [data.selectedPath, data.imageList, isItemVisible, data.clickTriggeredScroll, performSafeScroll, gridHandle]);
 
   const setRatio = useCallback(
     (index: number, ratio: number) => {
@@ -648,6 +633,22 @@ export default function Filmstrip({
     return () => ro.disconnect();
   }, []);
 
+  const groupingMode: GroupingMode = useSettingsStore((s) => s.appSettings?.grouping) ?? 'off';
+  const fullImageList = useLibraryStore((s) => s.imageList);
+
+  const filmstripActivePath = useMemo(() => {
+    const path = selectedImage?.path;
+    if (!path || groupingMode === 'off') return path;
+    if (path.includes('?vc=')) return path;
+    if (imageList.some((img) => img.path === path)) return path;
+    const selected = fullImageList.find((img) => img.path === path);
+    if (!selected?.group_id) return path;
+    const primary = imageList.find(
+      (img) => img.group_id === selected.group_id && !img.is_virtual_copy,
+    );
+    return primary?.path ?? path;
+  }, [selectedImage?.path, imageList, fullImageList, groupingMode]);
+
   const handleImageSelect = (path: string, event: any) => {
     if (path !== selectedImage?.path) {
       clickTriggeredScroll.current = true;
@@ -664,7 +665,7 @@ export default function Filmstrip({
           data={{
             imageList,
             imageRatings,
-            selectedPath: selectedImage?.path,
+            selectedPath: filmstripActivePath,
             multiSelectedPaths,
             thumbnailAspectRatio,
             onContextMenu,

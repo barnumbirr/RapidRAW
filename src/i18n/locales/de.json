@@ -111,12 +111,19 @@
       "threshold": "Schwellenwert"
     },
     "effects": {
-      "amount": "Betrag",
+      "amount": "Stärke",
+      "bokehCircular": "Kreisförmig",
+      "bokehHexagonal": "Sechseckig",
+      "bokehOctagonal": "Achteckig",
+      "bokehRing": "Blase (Ring)",
+      "bokehShape": "Bokeh-Form",
       "creative": "Kreativ",
       "feather": "Weiche Kante",
       "glow": "Glühen",
       "grain": "Körnung",
       "halation": "Lichthof",
+      "lensBlur": "Objektivunschärfe",
+      "lensDiffusion": "Streuung",
       "lightFlares": "Blendenflecke",
       "lut": "LUT",
       "midpoint": "Mittelpunkt",
@@ -248,6 +255,8 @@
       "duplicateImage": "Bild duplizieren",
       "exportImage_one": "Bild exportieren",
       "exportImage_other": "{{count}} Bilder exportieren",
+      "frameImages_one": "Bild rahmen",
+      "frameImages_other": "Bilder rahmen",
       "noAlbums": "Keine Alben verfügbar",
       "pasteAdjustments_one": "Einstellungen einfügen",
       "pasteAdjustments_other": "Einstellungen in {{count}} Bilder einfügen",
@@ -352,6 +361,7 @@
       "dropzoneText": "Hier ablegen, um eine neue Bearbeitung zu erstellen",
       "editSettingsTitle": "Bearbeitungseinstellungen",
       "editsTitle": "Bearbeitungen",
+      "generatingDepthMap": "KI-Tiefenkarte wird berechnet...",
       "generativeEditTitle": "Generative Bearbeitung",
       "inpaintingTitle": "Reparieren",
       "manualCleanupTitle": "Manuelle Bereinigung",
@@ -365,7 +375,11 @@
         "aiEdit_one": "KI-Bearbeitung {{count}}",
         "aiEdit_other": "KI-Bearbeitung {{count}}",
         "clone": "Klonen {{count}}",
+        "clone_one": "Klonen {{count}}",
+        "clone_other": "Klonen {{count}}",
         "heal": "Reparieren {{count}}",
+        "heal_one": "Reparieren {{count}}",
+        "heal_other": "Reparieren {{count}}",
         "invertedName": "{{name}} umgekehrt",
         "quickErase": "Schnelles Löschen {{count}}",
         "quickErase_one": "Schnelles Löschen {{count}}",
@@ -705,6 +719,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "Blende",
         "backToLibrary": "Zurück zur Bibliothek",
@@ -726,6 +741,14 @@
       "preserveFolders": "Ordnerstruktur beibehalten",
       "preserveTimestamps": "Dateizeitstempel aus EXIF-Aufnahmedatum setzen",
       "title": "Exporteinstellungen"
+    },
+    "border": {
+      "addBorder": "Rahmen hinzufügen",
+      "aspectRatio": "Seitenverhältnis",
+      "background": "Hintergrund",
+      "cornerRadius": "Eckenradius",
+      "originalRatio": "Original",
+      "spacing": "Abstand"
     },
     "bytes": {
       "bytes": "Bytes",
@@ -767,6 +790,7 @@
     },
     "sections": {
       "advanced": "Erweitert",
+      "border": "Rahmen",
       "fileNaming": "Dateibenennung",
       "fileSettings": "Dateieinstellungen",
       "imageSizing": "Bildgröße",
@@ -776,6 +800,7 @@
     "status": {
       "cancelExport": "Export abbrechen",
       "cancelled": "Export abgebrochen",
+      "cancelling": "Export wird abgebrochen…",
       "estimatedAverageSize": " ({{size}} Ø)",
       "estimatedSize": "Geschätzte Dateigröße: ~{{size}}",
       "estimatedTotalSize": "Geschätzte Gesamtgröße: ~{{size}}",
@@ -830,6 +855,31 @@
         "name": "Name (A-Z)"
       }
     },
+    "culling": {
+      "addTagPlaceholder": "Tag hinzufügen...",
+      "altCullingPreviewHighRes": "Culling-Vorschau in hoher Auflösung",
+      "altThumbnailLoading": "Miniaturansicht wird geladen",
+      "aperture": "Blende",
+      "cameraSettings": "Kameraeinstellungen",
+      "clickThumbnailsHint": "Klicken Sie auf Miniaturansichten in der rechten Seitenleiste, um sie zur Vergleichsansicht hinzuzufügen.",
+      "colorLabel": "Farbmarkierung",
+      "dimensions": "Abmessungen",
+      "editImage": "Bild bearbeiten",
+      "focalLength": "Brennweite",
+      "iso": "ISO",
+      "metadata": "Metadaten",
+      "noMetadataAvailable": "Keine Metadaten verfügbar",
+      "noTagsAdded": "Keine Tags hinzugefügt",
+      "none": "Keine",
+      "rateAndLabel": "Bewerten & Markieren",
+      "rating": "Bewertung",
+      "selectImagesToCompare": "Wählen Sie Bilder zum Vergleichen aus",
+      "shutterSpeed": "Verschlusszeit",
+      "syncZoomAndPan": "Zoom und Schwenken synchronisieren",
+      "tags": "Tags",
+      "toggleFit": "1:1 / Einpassen umschalten",
+      "vc": "VK"
+    },
     "filters": {
       "edited": {
         "all": "Alle Bilder",
@@ -851,7 +901,6 @@
       "raw": {
         "all": "Alle Typen",
         "nonRawOnly": "Nur Nicht-RAW",
-        "preferRaw": "RAW bevorzugen",
         "rawOnly": "Nur RAW"
       }
     },
@@ -915,6 +964,12 @@
         "filterByEdited": "Nach Bearbeitungsstatus filtern",
         "filterByFileType": "Nach Dateityp filtern",
         "filterByRating": "Nach Bewertung filtern",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
+        "groupOff": "Off",
+        "groupPreferJpeg": "Prefer JPEG",
+        "groupPreferRaw": "Prefer RAW",
+        "groupRawJpeg": "Group RAW + JPEG",
         "metadataAlways": "Immer",
         "metadataHover": "Beim Darüberfahren",
         "metadataOff": "Aus",
@@ -1072,6 +1127,9 @@
       "confirm": "Bestätigen"
     },
     "copyPaste": {
+      "autoSyncDesc": "Wendet Anpassungen automatisch auf alle ausgewählten Bilder an.",
+      "autoSyncLabel": "Auto-Sync aktivieren",
+      "autoSyncTitle": "Anpassungen automatisch synchronisieren",
       "cancel": "Abbrechen",
       "descMerge": "Fügt Ihre kopierten Änderungen hinzu und lässt andere Einstellungen unberührt.",
       "descReplace": "Überschreibt alle ausgewählten Einstellungen und setzt den Rest auf Standardwerte zurück.",
@@ -1451,7 +1509,9 @@
         "copy_files": "Ausgewählte Datei(en) kopieren",
         "cycle_zoom": "Zoom durchwechseln (Einpassen, 2x Einpassen, 100%)",
         "delete_selected": "Ausgewählte Datei(en) löschen",
+        "focus_search": "Suchfeld fokussieren",
         "open_image": "Ausgewähltes Bild öffnen",
+        "open_settings": "Einstellungen öffnen",
         "paste_adjustments": "Kopierte Anpassungen einfügen",
         "paste_files": "Datei(en) in aktuellen Ordner einfügen",
         "preview_next": "Nächstes Bild",

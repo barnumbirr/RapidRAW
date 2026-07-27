@@ -24,12 +24,13 @@ import {
   Check,
 } from 'lucide-react';
 import clsx from 'clsx';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api/core';
 import Text from '../ui/Text';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../types/typography';
+import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { AlbumItem, AlbumGroup, Album, Invokes, FolderTreeSort, SortDirection } from '../ui/AppProperties';
@@ -615,7 +616,12 @@ export default function FolderTree({
   isInstantTransition,
 }: FolderTreeProps) {
   const { t } = useTranslation();
-  const { appSettings, handleSettingsChange } = useSettingsStore();
+  const { appSettings, handleSettingsChange } = useSettingsStore(
+    useShallow((state) => ({
+      appSettings: state.appSettings,
+      handleSettingsChange: state.handleSettingsChange,
+    })),
+  );
   const {
     folderTrees,
     pinnedFolderTrees,
@@ -625,7 +631,18 @@ export default function FolderTree({
     albumTree,
     activeAlbumId,
     expandedAlbumGroups,
-  } = useLibraryStore();
+  } = useLibraryStore(
+    useShallow((state) => ({
+      folderTrees: state.folderTrees,
+      pinnedFolderTrees: state.pinnedFolderTrees,
+      currentFolderPath: state.currentFolderPath,
+      expandedFolders: state.expandedFolders,
+      isTreeLoading: state.isTreeLoading,
+      albumTree: state.albumTree,
+      activeAlbumId: state.activeAlbumId,
+      expandedAlbumGroups: state.expandedAlbumGroups,
+    })),
+  );
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isHovering, setIsHovering] = useState(false);
@@ -849,6 +866,7 @@ export default function FolderTree({
             </div>
           </div>
 
+          <LayoutGroup id="folder-tree">
           <div className="flex-1 overflow-y-auto" onContextMenu={handleEmptyAreaContextMenu}>
             {hasVisiblePinnedTrees && (
               <>
@@ -1072,6 +1090,7 @@ export default function FolderTree({
               </div>
             )}
           </div>
+          </LayoutGroup>
         </div>
       )}
     </div>

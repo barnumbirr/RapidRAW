@@ -20,6 +20,11 @@ export function useExportSettings() {
   const [watermarkScale, setWatermarkScale] = useState(10);
   const [watermarkSpacing, setWatermarkSpacing] = useState(5);
   const [watermarkOpacity, setWatermarkOpacity] = useState(75);
+  const [enableBorder, setEnableBorder] = useState(false);
+  const [borderSpacing, setBorderSpacing] = useState(15);
+  const [borderColor, setBorderColor] = useState('#FFFFFF');
+  const [borderCornerRadius, setBorderCornerRadius] = useState(0);
+  const [borderAspectRatio, setBorderAspectRatio] = useState('original');
 
   const handleApplyPreset = useCallback((preset: ExportPreset) => {
     setFileFormat(preset.fileFormat);
@@ -40,6 +45,11 @@ export function useExportSettings() {
     setWatermarkScale(preset.watermarkScale);
     setWatermarkSpacing(preset.watermarkSpacing);
     setWatermarkOpacity(preset.watermarkOpacity);
+    setEnableBorder(preset.enableBorder ?? false);
+    setBorderSpacing(preset.borderSpacing ?? 15);
+    setBorderColor(preset.borderColor ?? '#FFFFFF');
+    setBorderCornerRadius(preset.borderCornerRadius ?? 0);
+    setBorderAspectRatio(preset.borderAspectRatio ?? 'original');
   }, []);
 
   const currentSettingsObject = useMemo(
@@ -62,6 +72,11 @@ export function useExportSettings() {
       watermarkScale,
       watermarkSpacing,
       watermarkOpacity,
+      enableBorder,
+      borderSpacing,
+      borderColor,
+      borderCornerRadius,
+      borderAspectRatio,
     }),
     [
       fileFormat,
@@ -82,7 +97,12 @@ export function useExportSettings() {
       watermarkScale,
       watermarkSpacing,
       watermarkOpacity,
-    ]
+      enableBorder,
+      borderSpacing,
+      borderColor,
+      borderCornerRadius,
+      borderAspectRatio,
+    ],
   );
 
   return {
@@ -122,6 +142,16 @@ export function useExportSettings() {
     setWatermarkSpacing,
     watermarkOpacity,
     setWatermarkOpacity,
+    enableBorder,
+    setEnableBorder,
+    borderSpacing,
+    setBorderSpacing,
+    borderColor,
+    setBorderColor,
+    borderCornerRadius,
+    setBorderCornerRadius,
+    borderAspectRatio,
+    setBorderAspectRatio,
     handleApplyPreset,
     currentSettingsObject,
   };

@@ -112,11 +112,18 @@
     },
     "effects": {
       "amount": "適用量",
+      "bokehCircular": "円形",
+      "bokehHexagonal": "六角形",
+      "bokehOctagonal": "八角形",
+      "bokehRing": "バブル（リング）",
+      "bokehShape": "ボケの形状",
       "creative": "クリエイティブ",
       "feather": "ぼかし",
       "glow": "グロー",
       "grain": "粒子",
       "halation": "ハレーション",
+      "lensBlur": "レンズぼかし",
+      "lensDiffusion": "拡散",
       "lightFlares": "ライトフレア",
       "lut": "LUT",
       "midpoint": "中間点",
@@ -248,6 +255,8 @@
       "duplicateImage": "画像を複製",
       "exportImage_one": "画像を書き出し",
       "exportImage_other": "{{count}} 枚の画像を書き出し",
+      "frameImages_one": "画像にフレームを追加",
+      "frameImages_other": "画像にフレームを追加",
       "noAlbums": "利用可能なアルバムがありません",
       "pasteAdjustments_one": "補正設定を貼り付け",
       "pasteAdjustments_other": "{{count}} 枚の画像に補正設定を貼り付け",
@@ -352,6 +361,7 @@
       "dropzoneText": "ここにドロップして新しい編集を作成",
       "editSettingsTitle": "編集設定",
       "editsTitle": "編集一覧",
+      "generatingDepthMap": "AI深度マップを計算中...",
       "generativeEditTitle": "生成編集",
       "inpaintingTitle": "インペインティング",
       "manualCleanupTitle": "手動クリーンアップ",
@@ -365,7 +375,9 @@
         "aiEdit_one": "AI編集 {{count}}",
         "aiEdit_other": "AI編集 {{count}}",
         "clone": "クローン {{count}}",
+        "clone_other": "クローン {{count}}",
         "heal": "修復 {{count}}",
+        "heal_other": "修復 {{count}}",
         "invertedName": "{{name}} 反転",
         "quickErase": "クイック消去 {{count}}",
         "quickErase_one": "クイック消去 {{count}}",
@@ -705,6 +717,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "絞り値",
         "backToLibrary": "ライブラリに戻る",
@@ -726,6 +739,14 @@
       "preserveFolders": "フォルダ構造を維持",
       "preserveTimestamps": "EXIFの撮影日時からファイルタイムスタンプを設定",
       "title": "書き出し設定"
+    },
+    "border": {
+      "addBorder": "枠を追加",
+      "aspectRatio": "アスペクト比",
+      "background": "背景",
+      "cornerRadius": "角丸",
+      "originalRatio": "オリジナル",
+      "spacing": "間隔"
     },
     "bytes": {
       "bytes": "バイト",
@@ -767,6 +788,7 @@
     },
     "sections": {
       "advanced": "詳細設定",
+      "border": "枠",
       "fileNaming": "ファイル名の命名",
       "fileSettings": "ファイル設定",
       "imageSizing": "画像サイズ",
@@ -776,6 +798,7 @@
     "status": {
       "cancelExport": "書き出しをキャンセル",
       "cancelled": "書き出しがキャンセルされました",
+      "cancelling": "書き出しをキャンセル中…",
       "estimatedAverageSize": " (平均 {{size}})",
       "estimatedSize": "推定ファイルサイズ: ~{{size}}",
       "estimatedTotalSize": "推定合計サイズ: ~{{size}}",
@@ -791,6 +814,7 @@
       "noImagesSelected": "画像が選択されていません。",
       "success": "書き出しが成功しました！"
     },
+    "title": "エクスポート",
     "watermark": {
       "addWatermark": "ウォーターマークを追加",
       "anchors": {
@@ -829,6 +853,31 @@
         "name": "名前 (A-Z)"
       }
     },
+    "culling": {
+      "addTagPlaceholder": "タグを追加...",
+      "altCullingPreviewHighRes": "高解像度選別プレビュー",
+      "altThumbnailLoading": "サムネイル読み込み中",
+      "aperture": "絞り",
+      "cameraSettings": "カメラ設定",
+      "clickThumbnailsHint": "右サイドバーのサムネイルをクリックして比較ビューに追加します。",
+      "colorLabel": "カラーラベル",
+      "dimensions": "寸法",
+      "editImage": "画像を編集",
+      "focalLength": "焦点距離",
+      "iso": "ISO",
+      "metadata": "メタデータ",
+      "noMetadataAvailable": "メタデータがありません",
+      "noTagsAdded": "タグが追加されていません",
+      "none": "なし",
+      "rateAndLabel": "評価とラベル",
+      "rating": "評価",
+      "selectImagesToCompare": "比較する画像を選択",
+      "shutterSpeed": "シャッタースピード",
+      "syncZoomAndPan": "ズームとパンを同期",
+      "tags": "タグ",
+      "toggleFit": "1:1 / 全体表示の切り替え",
+      "vc": "VC"
+    },
     "filters": {
       "edited": {
         "all": "すべての画像",
@@ -850,7 +899,6 @@
       "raw": {
         "all": "すべての種類",
         "nonRawOnly": "非RAWのみ",
-        "preferRaw": "RAWを優先",
         "rawOnly": "RAWのみ"
       }
     },
@@ -914,6 +962,12 @@
         "filterByEdited": "編集状態でフィルター",
         "filterByFileType": "ファイル形式でフィルター",
         "filterByRating": "評価でフィルター",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
+        "groupOff": "Off",
+        "groupPreferJpeg": "Prefer JPEG",
+        "groupPreferRaw": "Prefer RAW",
+        "groupRawJpeg": "Group RAW + JPEG",
         "metadataAlways": "常に表示",
         "metadataHover": "ホバー時に表示",
         "metadataOff": "オフ",
@@ -1071,6 +1125,9 @@
       "confirm": "確認"
     },
     "copyPaste": {
+      "autoSyncDesc": "選択したすべての画像に調整を自動的に適用します。",
+      "autoSyncLabel": "自動同期を有効にする",
+      "autoSyncTitle": "調整の自動同期",
       "cancel": "キャンセル",
       "descMerge": "コピーした設定を追加し、その他の設定はそのまま残します。",
       "descReplace": "選択したすべての設定を上書きし、残りの設定をデフォルトにリセットします。",
@@ -1450,7 +1507,9 @@
         "copy_files": "選択したファイルをコピー",
         "cycle_zoom": "ズームの切り替え (全体表示、2倍拡大、100%)",
         "delete_selected": "選択したファイルを削除",
+        "focus_search": "検索フィールドにフォーカス",
         "open_image": "選択した画像を開く",
+        "open_settings": "設定を開く",
         "paste_adjustments": "コピーした補正設定を貼り付け",
         "paste_files": "現在のフォルダにファイルを貼り付け",
         "preview_next": "次の画像",

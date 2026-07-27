@@ -60,6 +60,20 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+- **2026-07-25:** Added headless CLI batch export supporting custom JSON adjustments
+- **2026-07-24:** Added Ctrl/Cmd+F search shortcut and optimized library & scope performance
+- **2026-07-23:** Significantly improved HDD thumbnail loading and resolved Linux NVIDIA crash issues
+- **2026-07-22:** Calibrated JPEG XL (JXL) export quality curves
+- **2026-07-20:** Made automatic adjustment synchronization optional for multi-selections
+- **2026-07-19:** Introduced new Culling View (up to 6 images side-by-side) with star ratings and metadata
+- **2026-07-16:** Enhanced crop tool with area preservation and crop-centered rotation
+- **2026-07-15:** Fixed Canon multi-exposure WB, reduced export RAM usage, and added settings shortcut
+- **2026-07-14:** Improved EXIF lens metadata extraction and fixed crop scaling bugs
+- **2026-07-12:** Added layout-aware keybinds, adjusted black levels, and fixed patch offsets on transformed images
+
+<details>
+<summary><strong>Expand further</strong></summary>
+
 - **2026-07-11:** Added new local Clone and Heal cleanup tools with highly optimized, parallelized processing. Also fixed Android back-button navigation and resolved an issue causing freezes with iCloud
 - **2026-07-08:** Improved thumbnail loading speeds using native file transfers and updated core rendering engines for better overall performance and compatibility
 - **2026-07-06:** Fixed copying adjustments directly from the filmstrip, resolved AI model and LUT download issues on Android, and fixed several Windows-specific bugs (including offscreen windows and folder exports)
@@ -70,10 +84,6 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - **2026-06-20:** Added quick filters to the bottom bar and integrated global hue shifts into the copy-paste system
 - **2026-06-18:** New preset intensity slider
 - **2026-06-14:** Added Korean translation support and integrated the global hue slider
-
-<details>
-<summary><strong>Expand further</strong></summary>
-
 - **2026-06-12:** Refined and standardized Traditional Chinese translations
 - **2026-06-10:** Completed i18next configuration and added Traditional Chinese locale support
 - **2026-06-08:** Resolved infinite indexing loops, brightness bugs, and general compiler warnings
@@ -326,15 +336,6 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
         <li><strong>Non-Destructive Workflow:</strong> All edits are stored in a <code>.rrdata</code> sidecar file, leaving your original images untouched.</li>
         <li><strong>Lens Correction:</strong> Automatic distortion, TCA, and vignette correction powered by Lensfun.</li>
       </ul>
-      <h4>Professional Grade Adjustments</h4>
-      <ul>
-        <li><strong>Tonal Controls:</strong> Exposure, Tone Mapping (including AgX!), Contrast, Highlights, Shadows, Whites, and Blacks.</li>
-        <li><strong>Tone Curves:</strong> Full control over Luma/RGB channels.</li>
-        <li><strong>Color Grading:</strong> Temperature, Tint, Vibrance, Saturation, color wheels and a full HSL color mixer.</li>
-        <li><strong>Detail Enhancement:</strong> Sharpening, Clarity, Structure, and Noise Reduction.</li>
-        <li><strong>Effects:</strong> LUTs, Dehaze, Vignette, Glow, Halation, Flares and Film Grain.</li>
-        <li><strong>Transform Tools:</strong> Perspective correction, rotation, straightening, crop, and warping tools.</li>
-      </ul>
     </td>
     <td valign="top" width="50%">
       <h4>Library & Workflow</h4>
@@ -345,7 +346,24 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
         <li><strong>Filmstrip View:</strong> Quickly navigate between all the images in your current folder while editing.</li>
         <li><strong>Batch Operations:</strong> Save significant time by applying a consistent set of adjustments or exporting entire batches of images simultaneously.</li>
         <li><strong>EXIF Data Viewer:</strong> Gain insights by inspecting the complete metadata from your camera.</li>
+        <li><strong>Headless CLI Export:</strong> Batch export photos or entire directory trees directly from your terminal/scripts without launching the GUI.</li>
       </ul>
+    </td>
+  </tr>
+
+  <tr>
+    <td valign="top" width="50%" style="border-top: 1px solid #444; padding-top: 12px;">
+      <h4>Professional Grade Adjustments</h4>
+      <ul>
+        <li><strong>Tonal Controls:</strong> Exposure, Tone Mapping (including AgX!), Contrast, Highlights, Shadows, Whites, and Blacks.</li>
+        <li><strong>Tone Curves:</strong> Full control over Luma/RGB channels.</li>
+        <li><strong>Color Grading:</strong> Temperature, Tint, Vibrance, Saturation, color wheels and a full HSL color mixer.</li>
+        <li><strong>Detail Enhancement:</strong> Sharpening, Clarity, Structure, and Noise Reduction.</li>
+        <li><strong>Effects:</strong> LUTs, Dehaze, Vignette, Glow, Halation, Flares and Film Grain.</li>
+        <li><strong>Transform Tools:</strong> Perspective correction, rotation, straightening, crop, and warping tools.</li>
+      </ul>
+    </td>
+    <td valign="top" width="50%" style="border-top: 1px solid #444; padding-top: 12px;">
       <h4>Productivity & UI</h4>
       <ul>
         <li><strong>Preset System:</strong> Create, save, import, and share your favorite looks.</li>
@@ -536,6 +554,29 @@ npm install
 # 3. Build and run the application
 npm start
 ```
+
+## Command Line Interface (CLI)
+
+RapidRAW includes a headless export tool for batch processing photos in automated scripts, terminal pipelines, or server environments without opening the GUI:
+
+```bash
+# Export a folder using the default edits found in .rrdata sidecar files
+rapidraw export /path/to/photos --output /path/to/output_dir --format jpeg --quality 90
+
+# Batch export a folder using a custom adjustments JSON
+rapidraw export /path/to/photos --output /path/to/output_dir --adjustments /path/to/preset.json
+```
+
+> **Note:** By default, headless export automatically detects and applies edits stored in `.rrdata` sidecar files located alongside your source images. You can override this by passing a custom JSON file using the `--adjustments` flag.
+
+| Option                 | Description                                                               | Default           |
+| :--------------------- | :------------------------------------------------------------------------ | :---------------- |
+| `<source>`             | Path to an image file or directory containing images                      | _(Required)_      |
+| `--output <path>`      | Target folder for exported images                                         | _(Required)_      |
+| `--format <fmt>`       | Output format (`jpeg`, `png`, `webp`, `avif`, `tiff`, `jxl`, `cube`)      | `jpeg`            |
+| `--quality <1-100>`    | Image export quality                                                      | `90`              |
+| `--keep-metadata`      | Retain EXIF/capture metadata in exported files                            | `false`           |
+| `--adjustments <path>` | Path to a custom JSON file containing adjustments to override the sidecar | _(Auto-detected)_ |
 
 ## System Requirements
 

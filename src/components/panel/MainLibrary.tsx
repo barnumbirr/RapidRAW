@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import { open } from '@tauri-apps/plugin-shell';
 import {
@@ -12,12 +12,15 @@ import {
   Settings,
   Search,
   Users,
+  LayoutGrid,
+  Columns,
   SlidersHorizontal,
+  Rows3,
 } from 'lucide-react';
+import CullingView from './library/CullingView';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
-import SettingsPanel from './SettingsPanel';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import {
   AppSettings,
@@ -28,20 +31,33 @@ import {
   ThumbnailAspectRatio,
   RawStatus,
   EditedStatus,
+  LibraryDisplayMode,
 } from '../ui/AppProperties';
+import { GroupBadgeInfo, GroupId } from '../../utils/imageGrouping';
 import { ImportState, Status } from '../ui/ExportImportProperties';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { useUIStore } from '../../store/useUIStore';
+import SettingsPanel from './SettingsPanel';
 
 import LibraryGrid from './library/LibraryGrid';
 import { SearchInput, ViewOptionsDropdown } from './library/LibraryHeader';
+
+export interface ColumnWidths {
+  thumbnail: number;
+  name: number;
+  date: number;
+  rating: number;
+  color: number;
+}
 
 interface MainLibraryProps {
   activePath: string | null;
   aiModelDownloadStatus: string | null;
   appSettings: AppSettings | null;
   currentFolderPath: string | null;
+  groupBadgeInfo: Map<GroupId, GroupBadgeInfo> | null;
   imageList: Array<ImageFile>;
   imageRatings: Record<string, number>;
   importState: ImportState;
@@ -87,14 +103,92 @@ export interface ColumnWidths {
   focal: number;
 }
 
+interface DisplayModeSwitchProps {
+  displayMode: LibraryDisplayMode;
+  setDisplayMode: (mode: LibraryDisplayMode) => void;
+  t: any;
+}
+
+function DisplayModeSwitch({ displayMode, setDisplayMode, t }: DisplayModeSwitchProps) {
+  const options = useMemo(
+    () => [
+      {
+        id: LibraryDisplayMode.Grid,
+        Icon: LayoutGrid,
+        tooltip: t('library.viewMode.grid', { defaultValue: 'Grid View' }),
+      },
+      {
+        id: LibraryDisplayMode.List,
+        Icon: Rows3,
+        tooltip: t('library.viewMode.list', { defaultValue: 'List View' }),
+      },
+      {
+        id: LibraryDisplayMode.Cull,
+        Icon: Columns,
+        tooltip: t('library.viewMode.culling', { defaultValue: 'Culling View' }),
+      },
+    ],
+    [t],
+  );
+
+  const selectedIndex = options.findIndex((opt) => opt.id === displayMode);
+  const safeIndex = selectedIndex >= 0 ? selectedIndex : 0;
+
+  return (
+    <div className="flex items-center bg-surface p-1 rounded-lg border border-border-color/20 h-14 w-40 select-none">
+      <div className="relative flex w-full h-full">
+        <motion.div
+          className="absolute top-0 bottom-0 z-0 bg-bg-primary rounded-md shadow-sm"
+          initial={false}
+          animate={{
+            x: `${safeIndex * 100}%`,
+            width: `${100 / options.length}%`,
+          }}
+          transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+        />
+        {options.map((opt) => {
+          const Icon = opt.Icon;
+          const isActive = displayMode === opt.id;
+          return (
+            <button
+              key={opt.id}
+              onClick={() => setDisplayMode(opt.id)}
+              className={`relative z-10 flex-1 h-full flex items-center justify-center rounded-md transition-colors duration-200 outline-none focus:outline-none ${
+                isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'
+              }`}
+              data-tooltip={opt.tooltip}
+              style={{ WebkitTapHighlightColor: 'transparent' }}
+            >
+              <Icon className="w-5 h-5" />
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function MainLibrary(props: MainLibraryProps) {
   const { t } = useTranslation();
-  const [showSettings, setShowSettings] = useState(false);
+  const setUI = useUIStore((state) => state.setUI);
   const [appVersion, setAppVersion] = useState('');
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false);
   const [latestVersion, setLatestVersion] = useState('');
   const [isBusyDelayed, setIsBusyDelayed] = useState(false);
+  const [isBusyLoaderMounted, setIsBusyLoaderMounted] = useState(false);
   const [isProgressHovered, setIsProgressHovered] = useState(false);
+  const isSettingsOpen = useUIStore((state) => state.isSettingsOpen);
+
+  const libraryDisplayMode = props.appSettings?.libraryDisplayMode || LibraryDisplayMode.Grid;
+
+  const setLibraryDisplayMode = (mode: LibraryDisplayMode) => {
+    if (props.appSettings) {
+      props.onSettingsChange({
+        ...props.appSettings,
+        libraryDisplayMode: mode,
+      });
+    }
+  };
 
   const searchCriteria = useLibraryStore((state) => state.searchCriteria);
 
@@ -116,7 +210,6 @@ export default function MainLibrary(props: MainLibraryProps) {
       { key: RawStatus.All, label: t('library.filters.raw.all') },
       { key: RawStatus.RawOnly, label: t('library.filters.raw.rawOnly') },
       { key: RawStatus.NonRawOnly, label: t('library.filters.raw.nonRawOnly') },
-      { key: RawStatus.RawOverNonRaw, label: t('library.filters.raw.preferRaw') },
     ],
     [t],
   );
@@ -135,7 +228,6 @@ export default function MainLibrary(props: MainLibraryProps) {
       { id: ThumbnailSize.Small, label: t('library.thumbnailSize.small'), size: 160 },
       { id: ThumbnailSize.Medium, label: t('library.thumbnailSize.medium'), size: 240 },
       { id: ThumbnailSize.Large, label: t('library.thumbnailSize.large'), size: 320 },
-      { id: ThumbnailSize.List, label: t('library.thumbnailSize.list'), size: 48 },
     ],
     [t],
   );
@@ -179,6 +271,12 @@ export default function MainLibrary(props: MainLibraryProps) {
 
     return () => clearTimeout(timer);
   }, [isBusy]);
+
+  useEffect(() => {
+    if (isBusyDelayed) {
+      setIsBusyLoaderMounted(true);
+    }
+  }, [isBusyDelayed]);
 
   useEffect(() => {
     const compareVersions = (v1: string, v2: string) => {
@@ -263,10 +361,10 @@ export default function MainLibrary(props: MainLibraryProps) {
             </div>
 
             <div className="w-full h-full flex flex-col p-8 lg:p-16 overflow-y-auto custom-scrollbar relative z-10">
-              {showSettings ? (
+              {isSettingsOpen && props.appSettings ? (
                 <SettingsPanel
                   appSettings={props.appSettings}
-                  onBack={() => setShowSettings(false)}
+                  onBack={() => setUI({ isSettingsOpen: false })}
                   onLibraryRefresh={props.onLibraryRefresh}
                   onSettingsChange={props.onSettingsChange}
                   rootPaths={props.rootPaths}
@@ -296,7 +394,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                     <div className="flex flex-col w-full max-w-xs gap-4 relative z-10">
                       {hasLastPath && (
                         <Button
-                          className="rounded-md h-11 w-full flex justify-center items-center shadow-md"
+                          className="rounded-md h-11 w-full flex justify-center items-center shadow-md transition-transform duration-200 hover:scale-[1.01] active:scale-[.98]"
                           onClick={props.onContinueSession}
                           size="lg"
                         >
@@ -305,7 +403,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                       )}
                       <div className="flex items-center gap-2">
                         <Button
-                          className={`rounded-md grow flex justify-center items-center shadow-md h-11 ${
+                          className={`rounded-md grow flex justify-center items-center shadow-md h-11 transition-transform duration-200 hover:scale-[1.01] active:scale-[.98] ${
                             hasLastPath ? 'bg-surface text-text-primary' : ''
                           }`}
                           onClick={props.onOpenFolder}
@@ -319,8 +417,8 @@ export default function MainLibrary(props: MainLibraryProps) {
                               : t('library.splash.openFolder')}
                         </Button>
                         <Button
-                          className="px-3 bg-surface text-text-primary shadow-md h-11"
-                          onClick={() => setShowSettings(true)}
+                          className="px-3 bg-surface text-text-primary shadow-md h-11 transition-transform duration-200 hover:scale-[1.03] active:scale-[.96]"
+                          onClick={() => setUI({ isSettingsOpen: true })}
                           size="lg"
                           data-tooltip={t('settings.general.title')}
                           variant="ghost"
@@ -429,8 +527,15 @@ export default function MainLibrary(props: MainLibraryProps) {
                 className={`flex items-center gap-2 overflow-hidden transition-all duration-300 whitespace-nowrap ${
                   isBusyDelayed ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0'
                 }`}
+                onTransitionEnd={(e) => {
+                  if (e.propertyName === 'opacity' && !isBusyDelayed) {
+                    setIsBusyLoaderMounted(false);
+                  }
+                }}
               >
-                <Loader2 size={14} className="animate-spin text-text-secondary shrink-0" />
+                {isBusyLoaderMounted && (
+                  <Loader2 size={14} className="animate-spin text-text-secondary shrink-0" />
+                )}
                 <div
                   className={`flex items-center transition-all duration-300 ease-out overflow-hidden ${
                     isProgressHovered && isBusyDelayed && (props.thumbnailProgress?.total ?? 0) > 0
@@ -446,7 +551,7 @@ export default function MainLibrary(props: MainLibraryProps) {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-4 shrink-0">
           {props.importState.status === Status.Importing && (
             <Text as="div" color={TextColors.accent} className="flex items-center gap-2 animate-pulse">
               <FolderInput size={16} />
@@ -470,44 +575,55 @@ export default function MainLibrary(props: MainLibraryProps) {
               <span>{t('library.import.failed')}</span>
             </Text>
           )}
-          <SearchInput indexingProgress={props.indexingProgress} isIndexing={props.isIndexing} />
-          <ViewOptionsDropdown
-            libraryViewMode={props.libraryViewMode}
-            onSelectSize={props.onThumbnailSizeChange}
-            onSelectAspectRatio={props.onThumbnailAspectRatioChange}
-            setLibraryViewMode={props.setLibraryViewMode}
-            thumbnailSize={props.thumbnailSize}
-            thumbnailAspectRatio={props.thumbnailAspectRatio}
-            thumbnailSizeOptions={translatedThumbnailSizeOptions}
-            thumbnailAspectRatioOptions={translatedThumbnailAspectRatioOptions}
-            ratingFilterOptions={translatedRatingFilterOptions}
-            rawStatusOptions={translatedRawStatusOptions}
-            editedStatusOptions={translatedEditedStatusOptions}
-            sortOptions={translatedSortOptions}
-          />
-          {!props.isAndroid && (
-            <>
+          <DisplayModeSwitch displayMode={libraryDisplayMode} setDisplayMode={setLibraryDisplayMode} t={t} />
+
+          <div className="flex items-center bg-surface p-1 rounded-lg gap-1 border border-border-color/20">
+            <SearchInput indexingProgress={props.indexingProgress} isIndexing={props.isIndexing} />
+            <ViewOptionsDropdown
+              libraryViewMode={props.libraryViewMode}
+              onSelectSize={props.onThumbnailSizeChange}
+              onSelectAspectRatio={props.onThumbnailAspectRatioChange}
+              onLibraryRefresh={props.onLibraryRefresh}
+              setLibraryViewMode={props.setLibraryViewMode}
+              thumbnailSize={props.thumbnailSize}
+              thumbnailAspectRatio={props.thumbnailAspectRatio}
+              thumbnailSizeOptions={translatedThumbnailSizeOptions}
+              thumbnailAspectRatioOptions={translatedThumbnailAspectRatioOptions}
+              ratingFilterOptions={translatedRatingFilterOptions}
+              rawStatusOptions={translatedRawStatusOptions}
+              editedStatusOptions={translatedEditedStatusOptions}
+              sortOptions={translatedSortOptions}
+            />
+            {!props.isAndroid && (
               <Button
-                className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
+                className="h-12 w-12 bg-transparent text-text-primary shadow-none p-0 flex items-center justify-center"
                 onClick={props.onNavigateToCommunity}
                 data-tooltip={t('library.tooltips.communityPresets')}
               >
-                <Users className="w-8 h-8" />
+                <Users className="w-5 h-5" />
               </Button>
-            </>
-          )}
-          <Button
-            className="h-12 w-12 bg-surface text-text-primary shadow-none p-0 flex items-center justify-center"
-            onClick={props.onGoHome}
-            data-tooltip={t('library.tooltips.goHome')}
-          >
-            <Home className="w-8 h-8" />
-          </Button>
+            )}
+            <Button
+              className="h-12 w-12 bg-transparent text-text-primary shadow-none p-0 flex items-center justify-center"
+              onClick={props.onGoHome}
+              data-tooltip={t('library.tooltips.goHome')}
+            >
+              <Home className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </header>
 
       {props.imageList.length > 0 ? (
-        <LibraryGrid {...props} thumbnailSizeOptions={translatedThumbnailSizeOptions} />
+        libraryDisplayMode === LibraryDisplayMode.Cull ? (
+          <CullingView {...props} />
+        ) : (
+          <LibraryGrid
+            {...props}
+            libraryDisplayMode={libraryDisplayMode}
+            thumbnailSizeOptions={translatedThumbnailSizeOptions}
+          />
+        )
       ) : props.isIndexing || props.aiModelDownloadStatus || props.importState.status === Status.Importing ? (
         <div className="flex-1 flex flex-col items-center justify-center" onContextMenu={props.onEmptyAreaContextMenu}>
           <Loader2 className="h-12 w-12 text-secondary animate-spin mb-4" />

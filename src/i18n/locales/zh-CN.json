@@ -112,11 +112,18 @@
     },
     "effects": {
       "amount": "数量",
+      "bokehCircular": "圆形",
+      "bokehHexagonal": "六边形",
+      "bokehOctagonal": "八边形",
+      "bokehRing": "气泡（环形）",
+      "bokehShape": "散景形状",
       "creative": "创意",
       "feather": "羽化",
       "glow": "发光",
       "grain": "颗粒",
       "halation": "光晕",
+      "lensBlur": "镜头模糊",
+      "lensDiffusion": "扩散",
       "lightFlares": "光线耀斑",
       "lut": "LUT",
       "midpoint": "中点",
@@ -248,6 +255,8 @@
       "duplicateImage": "复制图像",
       "exportImage_one": "导出图像",
       "exportImage_other": "导出 {{count}} 张图像",
+      "frameImages_one": "装裱图像",
+      "frameImages_other": "装裱图像",
       "noAlbums": "无可用相册",
       "pasteAdjustments_one": "粘贴调整",
       "pasteAdjustments_other": "粘贴调整到 {{count}} 张图像",
@@ -352,6 +361,7 @@
       "dropzoneText": "拖放到此处以创建新编辑",
       "editSettingsTitle": "编辑设置",
       "editsTitle": "编辑",
+      "generatingDepthMap": "正在计算 AI 深度图...",
       "generativeEditTitle": "生成式编辑",
       "inpaintingTitle": "图像修复",
       "manualCleanupTitle": "手动清理",
@@ -365,7 +375,9 @@
         "aiEdit_one": "AI 编辑 {{count}}",
         "aiEdit_other": "AI 编辑 {{count}}",
         "clone": "克隆 {{count}}",
+        "clone_other": "克隆 {{count}}",
         "heal": "修复 {{count}}",
+        "heal_other": "修复 {{count}}",
         "invertedName": "{{name}} 反转",
         "quickErase": "快速擦除 {{count}}",
         "quickErase_one": "快速擦除 {{count}}",
@@ -705,6 +717,7 @@
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "光圈",
         "backToLibrary": "返回图库",
@@ -726,6 +739,14 @@
       "preserveFolders": "保留文件夹结构",
       "preserveTimestamps": "将文件时间戳设为 EXIF 拍摄日期",
       "title": "导出设置"
+    },
+    "border": {
+      "addBorder": "添加边框",
+      "aspectRatio": "宽高比",
+      "background": "背景",
+      "cornerRadius": "边框圆角",
+      "originalRatio": "原始",
+      "spacing": "间距"
     },
     "bytes": {
       "bytes": "字节",
@@ -767,6 +788,7 @@
     },
     "sections": {
       "advanced": "高级",
+      "border": "边框",
       "fileNaming": "文件命名",
       "fileSettings": "文件设置",
       "imageSizing": "图像大小",
@@ -776,6 +798,7 @@
     "status": {
       "cancelExport": "取消导出",
       "cancelled": "导出已取消",
+      "cancelling": "正在取消导出…",
       "estimatedAverageSize": "（平均 {{size}}）",
       "estimatedSize": "预计文件大小：约 {{size}}",
       "estimatedTotalSize": "预计总大小：约 {{size}}",
@@ -830,6 +853,31 @@
         "name": "名称（A-Z）"
       }
     },
+    "culling": {
+      "addTagPlaceholder": "添加标签...",
+      "altCullingPreviewHighRes": "高分辨率筛选预览",
+      "altThumbnailLoading": "缩略图加载中",
+      "aperture": "光圈",
+      "cameraSettings": "相机设置",
+      "clickThumbnailsHint": "在右侧边栏中单击缩略图以将它们添加到比较视图中。",
+      "colorLabel": "颜色标签",
+      "dimensions": "尺寸",
+      "editImage": "编辑图像",
+      "focalLength": "焦距",
+      "iso": "ISO",
+      "metadata": "元数据",
+      "noMetadataAvailable": "无可用元数据",
+      "noTagsAdded": "未添加标签",
+      "none": "无",
+      "rateAndLabel": "评分与标签",
+      "rating": "评分",
+      "selectImagesToCompare": "选择要比较的图像",
+      "shutterSpeed": "快门速度",
+      "syncZoomAndPan": "同步缩放和平移",
+      "tags": "标签",
+      "toggleFit": "切换 1:1 / 适应",
+      "vc": "VC"
+    },
     "filters": {
       "edited": {
         "all": "所有图像",
@@ -851,7 +899,6 @@
       "raw": {
         "all": "所有类型",
         "nonRawOnly": "仅非 RAW",
-        "preferRaw": "优先 RAW",
         "rawOnly": "仅 RAW"
       }
     },
@@ -915,6 +962,12 @@
         "filterByEdited": "按编辑状态过滤",
         "filterByFileType": "按文件类型过滤",
         "filterByRating": "按评分过滤",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
+        "groupOff": "Off",
+        "groupPreferJpeg": "Prefer JPEG",
+        "groupPreferRaw": "Prefer RAW",
+        "groupRawJpeg": "Group RAW + JPEG",
         "metadataAlways": "始终",
         "metadataHover": "悬停时",
         "metadataOff": "关闭",
@@ -1072,6 +1125,9 @@
       "confirm": "确认"
     },
     "copyPaste": {
+      "autoSyncDesc": "自动将调整应用于所有选定的图像。",
+      "autoSyncLabel": "启用自动同步",
+      "autoSyncTitle": "自动同步调整",
       "cancel": "取消",
       "descMerge": "添加您复制的更改，保留其他设置不变。",
       "descReplace": "覆盖所有选中的设置，其余重置为默认值。",
@@ -1451,7 +1507,9 @@
         "copy_files": "复制选中的文件",
         "cycle_zoom": "循环缩放（适应、2倍适应、100%）",
         "delete_selected": "删除选中的文件",
+        "focus_search": "聚焦搜索框",
         "open_image": "打开选中的图像",
+        "open_settings": "打开设置",
         "paste_adjustments": "粘贴复制的调整",
         "paste_files": "将文件粘贴到当前文件夹",
         "preview_next": "下一张",

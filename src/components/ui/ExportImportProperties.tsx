@@ -45,6 +45,7 @@ export interface ExportSettings {
   } | null;
   stripGps: boolean;
   watermark: WatermarkSettings | null;
+  border: BorderSettings | null;
   exportMasks?: boolean;
   preserveFolders?: boolean;
 }
@@ -69,6 +70,13 @@ export interface WatermarkSettings {
   opacity: number;
 }
 
+export interface BorderSettings {
+  spacing: number;
+  color: string;
+  cornerRadius: number;
+  aspectRatio: number | null;
+}
+
 export interface ExportState {
   errorMessage: string;
   progress: Progress;
@@ -90,6 +98,7 @@ export interface ImportState {
 
 export enum Status {
   Cancelled = 'cancelled',
+  Cancelling = 'cancelling',
   Exporting = 'exporting',
   Error = 'error',
   Idle = 'idle',
@@ -118,5 +127,10 @@ export interface ExportPreset {
   watermarkScale: number;
   watermarkSpacing: number;
   watermarkOpacity: number;
+  enableBorder?: boolean;
+  borderSpacing?: number;
+  borderColor?: string;
+  borderCornerRadius?: number;
+  borderAspectRatio?: string;
   lastExportPath?: string;
 }

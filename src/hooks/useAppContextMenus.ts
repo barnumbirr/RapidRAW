@@ -8,6 +8,7 @@ import {
   CopyPlus,
   Edit,
   FileEdit,
+  Frame,
   FileInput,
   Folder,
   FolderInput,
@@ -235,7 +236,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               icon: LayoutTemplate,
               label: t('contextMenus.editor.frameImage'),
               onClick: () => {
-                setUI({ collageModalState: { isOpen: true, sourceImages: [selectedImage] } });
+                setUI({ collageModalState: { isOpen: true, sourceImages: [selectedImage], frameMode: true } });
               },
             },
             { label: t('contextMenus.editor.cullImage'), icon: Users, disabled: true },
@@ -320,7 +321,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
   );
 
   const handleThumbnailContextMenu = useCallback(
-    (event: any, path: string) => {
+    (event: any, path: string, forceSingleSelection: boolean = false) => {
       event.preventDefault();
       event.stopPropagation();
 
@@ -334,7 +335,9 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const isTargetInSelection = multiSelectedPaths.includes(path);
       let finalSelection: string[];
 
-      if (!isTargetInSelection) {
+      if (forceSingleSelection) {
+        finalSelection = [path];
+      } else if (!isTargetInSelection) {
         finalSelection = [path];
         setLibrary({ multiSelectedPaths: [path] });
         if (!selectedImage) {
@@ -358,10 +361,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         imageList.some((image) => image.path.startsWith(`${finalSelection[0]}?vc=`));
 
       const hasAssociatedFiles = finalSelection.some((selectedPath) => {
-        const lastDotIndex = selectedPath.lastIndexOf('.');
-        if (lastDotIndex === -1) return false;
-        const basePath = selectedPath.substring(0, lastDotIndex);
-        return imageList.some((image) => image.path.startsWith(basePath + '.') && image.path !== selectedPath);
+        const image = imageList.find((img) => img.path === selectedPath);
+        return image?.group_id != null;
       });
 
       let deleteSubmenu;
@@ -409,7 +410,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       const autoAdjustLabel = t('contextMenus.thumbnail.autoAdjust', { count: selectionCount });
       const renameLabel = t('contextMenus.thumbnail.renameImage', { count: selectionCount });
       const cullLabel = t('contextMenus.thumbnail.cullImage', { count: selectionCount });
-      const collageLabel = t('contextMenus.thumbnail.collage', { count: selectionCount });
+      const collageLabel = t('contextMenus.thumbnail.collage', { count: Math.max(selectionCount, 2) });
+      const frameImagesLabel = t('contextMenus.thumbnail.frameImages', { count: selectionCount });
       const stitchLabel = t('contextMenus.editor.stitchPanorama');
       const conversionLabel = t('contextMenus.thumbnail.convertNegative', { count: selectionCount });
       const denoiseLabel = t('contextMenus.thumbnail.denoise', { count: selectionCount });
@@ -605,13 +607,22 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
               },
             },
             {
+              icon: Frame,
+              label: frameImagesLabel,
+              onClick: () => {
+                const imagesToFrame = imageList.filter((img) => finalSelection.includes(img.path));
+                setUI({ collageModalState: { isOpen: true, sourceImages: imagesToFrame, frameMode: true } });
+              },
+              disabled: selectionCount === 0,
+            },
+            {
               icon: LayoutTemplate,
               label: collageLabel,
               onClick: () => {
                 const imagesForCollage = imageList.filter((img) => finalSelection.includes(img.path));
                 setUI({ collageModalState: { isOpen: true, sourceImages: imagesForCollage } });
               },
-              disabled: selectionCount === 0 || selectionCount > 9,
+              disabled: selectionCount < 2 || selectionCount > 9,
             },
             {
               label: cullLabel,

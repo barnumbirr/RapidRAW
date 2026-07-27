@@ -4,13 +4,15 @@ import { ChevronUp, ChevronDown } from 'lucide-react';
 import debounce from 'lodash.debounce';
 import { useTranslation } from 'react-i18next';
 import { Row } from './LibraryItems';
+import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../../../store/useLibraryStore';
-import { LibraryViewMode, SortDirection, ThumbnailSize } from '../../ui/AppProperties';
+import { LibraryViewMode, SortDirection, LibraryDisplayMode } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { ExifOverlay } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+
 
 function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
   const { t } = useTranslation();
@@ -160,6 +162,7 @@ export default function LibraryGrid(props: any) {
     imageList,
     libraryViewMode,
     thumbnailSize,
+    libraryDisplayMode,
     currentFolderPath,
     activePath,
     multiSelectedPaths,
@@ -171,8 +174,17 @@ export default function LibraryGrid(props: any) {
     onRequestThumbnails,
     thumbnailSizeOptions,
     onThumbnailSizeChange,
+    groupBadgeInfo,
   } = props;
-  const { listColumnWidths, setLibrary, sortCriteria, setSortCriteria } = useLibraryStore();
+  const { listColumnWidths, setLibrary, sortCriteria, setSortCriteria } = useLibraryStore(
+    useShallow((state) => ({
+      listColumnWidths: state.listColumnWidths,
+      setLibrary: state.setLibrary,
+      sortCriteria: state.sortCriteria,
+      setSortCriteria: state.setSortCriteria,
+    })),
+  );
+
   const [gridSize, setGridSize] = useState({ height: 0, width: 0 });
   const [listHandle, setListHandle] = useListCallbackRef();
   const [collapsedRecursiveFolders, setCollapsedRecursiveFolders] = useState<Set<string>>(new Set());
@@ -181,6 +193,8 @@ export default function LibraryGrid(props: any) {
   const loadedThumbnailsRef = useRef(new Set<string>());
   const requestQueueRef = useRef<Set<string>>(new Set());
   const requestTimeoutRef = useRef<any>(null);
+  const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
+  const showExifCols = exifOverlay !== ExifOverlay.Off;
 
   useEffect(() => {
     const el = libraryContainerRef.current;
@@ -276,7 +290,7 @@ export default function LibraryGrid(props: any) {
   const gridData = useMemo(() => {
     if (gridSize.width === 0 || imageList.length === 0) return null;
 
-    const isListView = thumbnailSize === ThumbnailSize.List;
+    const isListView = libraryDisplayMode === LibraryDisplayMode.List;
     const OUTER_PADDING = isListView ? 0 : 12;
     const ITEM_GAP = isListView ? 0 : 12;
     const minThumbWidth = thumbnailSizeOptions.find((o: any) => o.id === thumbnailSize)?.size || 240;
@@ -287,7 +301,17 @@ export default function LibraryGrid(props: any) {
       : Math.max(1, Math.floor((availableWidth + ITEM_GAP) / (minThumbWidth + ITEM_GAP)));
     const itemWidth = isListView ? availableWidth : (availableWidth - ITEM_GAP * (columnCount - 1)) / columnCount;
 
-    const listRowHeight = Math.max(36, Math.min(300, (availableWidth * listColumnWidths.thumbnail) / 100));
+    const totalBase =
+      listColumnWidths.thumbnail +
+      listColumnWidths.name +
+      listColumnWidths.date +
+      listColumnWidths.rating +
+      listColumnWidths.color +
+      (showExifCols
+        ? listColumnWidths.shutter + listColumnWidths.aperture + listColumnWidths.iso + listColumnWidths.focal
+        : 0);
+
+    const listRowHeight = Math.max(36, Math.min(300, (availableWidth * listColumnWidths.thumbnail) / totalBase));
     const rowHeight = isListView ? listRowHeight : itemWidth + ITEM_GAP;
     const headerHeight = 40;
 
@@ -338,6 +362,7 @@ export default function LibraryGrid(props: any) {
     gridSize.width,
     imageList,
     libraryViewMode,
+    libraryDisplayMode,
     collapsedRecursiveFolders,
     thumbnailSize,
     listColumnWidths.thumbnail,
@@ -442,6 +467,7 @@ export default function LibraryGrid(props: any) {
       columnWidths: listColumnWidths,
       queueThumbnailRequest,
       onToggleRecursiveFolder: handleToggleRecursiveFolder,
+      groupBadgeInfo,
     };
   }, [
     gridData,
@@ -457,7 +483,17 @@ export default function LibraryGrid(props: any) {
     listColumnWidths,
     queueThumbnailRequest,
     handleToggleRecursiveFolder,
+    groupBadgeInfo,
   ]);
+
+  const getItemSize = useCallback(
+    (index: number) => {
+      if (!gridData) return 0;
+      if (gridData.rows[index].type === 'footer') return gridData.isListView ? 24 : gridData.OUTER_PADDING;
+      return gridData.rows[index].type === 'header' ? gridData.headerHeight : gridData.rowHeight;
+    },
+    [gridData],
+  );
 
   if (!gridData) {
     return (
@@ -469,11 +505,6 @@ export default function LibraryGrid(props: any) {
       />
     );
   }
-
-  const getItemSize = (index: number) => {
-    if (gridData.rows[index].type === 'footer') return gridData.isListView ? 24 : gridData.OUTER_PADDING;
-    return gridData.rows[index].type === 'header' ? gridData.headerHeight : gridData.rowHeight;
-  };
 
   const handleHeaderSort = (key: string) => {
     props.onClearSelection();

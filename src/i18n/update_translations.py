@@ -5,150 +5,244 @@ LOCALES_DIR = Path("./locales")
 
 TRANSLATIONS = {
     "de": {
-        "masks": {
-            "clone": "Klonen",
-            "heal": "Reparieren"
+        "adjustments": {
+            "effects": {
+                "amount": "Stärke",
+                "bokehCircular": "Kreisförmig",
+                "bokehHexagonal": "Sechseckig",
+                "bokehOctagonal": "Achteckig",
+                "bokehRing": "Blase (Ring)",
+                "bokehShape": "Bokeh-Form",
+                "lensBlur": "Objektivunschärfe",
+                "lensDiffusion": "Streuung"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "Manuelle Bereinigung",
-            "generativeEditTitle": "Generative Bearbeitung",
-            "patches_clone": "Klonen {{count}}",
-            "patches_heal": "Reparieren {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "KI-Tiefenkarte wird berechnet..."
+            }
         }
     },
     "en": {
-        "masks": {
-            "clone": "Clone",
-            "heal": "Heal"
+        "adjustments": {
+            "effects": {
+                "amount": "Amount",
+                "bokehCircular": "Circular",
+                "bokehHexagonal": "Hexagonal",
+                "bokehOctagonal": "Octagonal",
+                "bokehRing": "Bubble (Ring)",
+                "bokehShape": "Bokeh Shape",
+                "lensBlur": "Lens Blur",
+                "lensDiffusion": "Diffusion"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "Manual Cleanup",
-            "generativeEditTitle": "Generative Edit",
-            "patches_clone": "Clone {{count}}",
-            "patches_heal": "Heal {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Calculating AI Depth Map..."
+            }
         }
     },
     "es": {
-        "masks": {
-            "clone": "Clonar",
-            "heal": "Curar"
+        "adjustments": {
+            "effects": {
+                "amount": "Cantidad",
+                "bokehCircular": "Circular",
+                "bokehHexagonal": "Hexagonal",
+                "bokehOctagonal": "Octogonal",
+                "bokehRing": "Burbuja (Anillo)",
+                "bokehShape": "Forma del bokeh",
+                "lensBlur": "Desenfoque de lente",
+                "lensDiffusion": "Difusión"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "Limpieza manual",
-            "generativeEditTitle": "Edición generativa",
-            "patches_clone": "Clonar {{count}}",
-            "patches_heal": "Curar {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Calculando mapa de profundidad IA..."
+            }
         }
     },
     "fr": {
-        "masks": {
-            "clone": "Cloner",
-            "heal": "Corriger"
+        "adjustments": {
+            "effects": {
+                "amount": "Intensité",
+                "bokehCircular": "Circulaire",
+                "bokehHexagonal": "Hexagonal",
+                "bokehOctagonal": "Octogonal",
+                "bokehRing": "Bulle (Anneau)",
+                "bokehShape": "Forme du bokeh",
+                "lensBlur": "Flou d'objectif",
+                "lensDiffusion": "Diffusion"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "Nettoyage manuel",
-            "generativeEditTitle": "Édition générative",
-            "patches_clone": "Cloner {{count}}",
-            "patches_heal": "Corriger {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Calcul de la carte de profondeur IA..."
+            }
         }
     },
     "it": {
-        "masks": {
-            "clone": "Clona",
-            "heal": "Ripara"
+        "adjustments": {
+            "effects": {
+                "amount": "Quantità",
+                "bokehCircular": "Circolare",
+                "bokehHexagonal": "Esagonale",
+                "bokehOctagonal": "Ottagonale",
+                "bokehRing": "Bolla (Anello)",
+                "bokehShape": "Forma del bokeh",
+                "lensBlur": "Sfocatura obiettivo",
+                "lensDiffusion": "Diffusione"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "Pulizia manuale",
-            "generativeEditTitle": "Modifica generativa",
-            "patches_clone": "Clona {{count}}",
-            "patches_heal": "Ripara {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Calcolo mappa di profondità IA..."
+            }
         }
     },
     "ja": {
-        "masks": {
-            "clone": "クローン",
-            "heal": "修復"
+        "adjustments": {
+            "effects": {
+                "amount": "適用量",
+                "bokehCircular": "円形",
+                "bokehHexagonal": "六角形",
+                "bokehOctagonal": "八角形",
+                "bokehRing": "バブル（リング）",
+                "bokehShape": "ボケの形状",
+                "lensBlur": "レンズぼかし",
+                "lensDiffusion": "拡散"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "手動クリーンアップ",
-            "generativeEditTitle": "生成編集",
-            "patches_clone": "クローン {{count}}",
-            "patches_heal": "修復 {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "AI深度マップを計算中..."
+            }
         }
     },
     "ko": {
-        "masks": {
-            "clone": "복제",
-            "heal": "복구"
+        "adjustments": {
+            "effects": {
+                "amount": "양",
+                "bokehCircular": "원형",
+                "bokehHexagonal": "육각형",
+                "bokehOctagonal": "팔각형",
+                "bokehRing": "버블 (링)",
+                "bokehShape": "보케 모양",
+                "lensBlur": "렌즈 블러",
+                "lensDiffusion": "확산"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "수동 정리",
-            "generativeEditTitle": "생성형 편집",
-            "patches_clone": "복제 {{count}}",
-            "patches_heal": "복구 {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "AI 심도 맵 계산 중..."
+            }
         }
     },
     "pl": {
-        "masks": {
-            "clone": "Klonowanie",
-            "heal": "Naprawianie"
+        "adjustments": {
+            "effects": {
+                "amount": "Ilość",
+                "bokehCircular": "Kołowy",
+                "bokehHexagonal": "Sześciokątny",
+                "bokehOctagonal": "Ośmiokątny",
+                "bokehRing": "Bąbelek (Pierścień)",
+                "bokehShape": "Kształt bokeh",
+                "lensBlur": "Rozmycie obiektywu",
+                "lensDiffusion": "Dyfuzja"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "Ręczne czyszczenie",
-            "generativeEditTitle": "Edycja generatywna",
-            "patches_clone": "Klonowanie {{count}}",
-            "patches_heal": "Naprawianie {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Obliczanie mapy głębi AI..."
+            }
         }
     },
     "pt": {
-        "masks": {
-            "clone": "Clonar",
-            "heal": "Restaurar"
+        "adjustments": {
+            "effects": {
+                "amount": "Quantidade",
+                "bokehCircular": "Circular",
+                "bokehHexagonal": "Hexagonal",
+                "bokehOctagonal": "Octogonal",
+                "bokehRing": "Bolha (Anel)",
+                "bokehShape": "Forma do bokeh",
+                "lensBlur": "Desfocagem de lente",
+                "lensDiffusion": "Difusão"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "Limpeza Manual",
-            "generativeEditTitle": "Edição Generativa",
-            "patches_clone": "Clonar {{count}}",
-            "patches_heal": "Restaurar {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "A calcular mapa de profundidade IA..."
+            }
         }
     },
     "ru": {
-        "masks": {
-            "clone": "Штамп",
-            "heal": "Восстановление"
+        "adjustments": {
+            "effects": {
+                "amount": "Величина",
+                "bokehCircular": "Круглая",
+                "bokehHexagonal": "Шестиугольная",
+                "bokehOctagonal": "Восьмиугольная",
+                "bokehRing": "Пузырь (Кольцо)",
+                "bokehShape": "Форма боке",
+                "lensBlur": "Размытие объектива",
+                "lensDiffusion": "Диффузия"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "Ручная очистка",
-            "generativeEditTitle": "Генеративное редактирование",
-            "patches_clone": "Штамп {{count}}",
-            "patches_heal": "Восстановление {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "Расчет карты глубины ИИ..."
+            }
         }
     },
     "zh-CN": {
-        "masks": {
-            "clone": "克隆",
-            "heal": "修复"
+        "adjustments": {
+            "effects": {
+                "amount": "数量",
+                "bokehCircular": "圆形",
+                "bokehHexagonal": "六边形",
+                "bokehOctagonal": "八边形",
+                "bokehRing": "气泡（环形）",
+                "bokehShape": "散景形状",
+                "lensBlur": "镜头模糊",
+                "lensDiffusion": "扩散"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "手动清理",
-            "generativeEditTitle": "生成式编辑",
-            "patches_clone": "克隆 {{count}}",
-            "patches_heal": "修复 {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "正在计算 AI 深度图..."
+            }
         }
     },
     "zh-TW": {
-        "masks": {
-            "clone": "仿製",
-            "heal": "修復"
+        "adjustments": {
+            "effects": {
+                "amount": "數量",
+                "bokehCircular": "圓形",
+                "bokehHexagonal": "六角形",
+                "bokehOctagonal": "八角形",
+                "bokehRing": "氣泡（環形）",
+                "bokehShape": "散景形狀",
+                "lensBlur": "鏡頭模糊",
+                "lensDiffusion": "擴散"
+            }
         },
-        "ai": {
-            "manualCleanupTitle": "手動清理",
-            "generativeEditTitle": "生成式編輯",
-            "patches_clone": "仿製 {{count}}",
-            "patches_heal": "修復 {{count}}"
+        "editor": {
+            "ai": {
+                "generatingDepthMap": "正在計算 AI 深度圖..."
+            }
         }
     }
 }
+
+def deep_merge(target: dict, source: dict):
+    """Recursively merges source dict into target dict."""
+    for key, value in source.items():
+        if isinstance(value, dict):
+            node = target.setdefault(key, {})
+            if isinstance(node, dict):
+                deep_merge(node, value)
+        else:
+            target[key] = value
 
 def sort_dict_recursively(item):
     if isinstance(item, dict):
@@ -169,23 +263,7 @@ def update_json_file(file_path: Path, trans: dict):
         print(f"Error parsing JSON in {file_path.name}. Skipping.")
         return
 
-    # masks -> types -> clone / heal
-    masks_node = data.setdefault("masks", {})
-    types_node = masks_node.setdefault("types", {})
-    types_node["clone"] = trans["masks"]["clone"]
-    types_node["heal"] = trans["masks"]["heal"]
-
-    # editor -> ai -> title translations
-    editor_node = data.setdefault("editor", {})
-    ai_node = editor_node.setdefault("ai", {})
-    ai_node["manualCleanupTitle"] = trans["ai"]["manualCleanupTitle"]
-    ai_node["generativeEditTitle"] = trans["ai"]["generativeEditTitle"]
-
-    # editor -> ai -> patches -> clone / heal
-    patches_node = ai_node.setdefault("patches", {})
-    patches_node["clone"] = trans["ai"]["patches_clone"]
-    patches_node["heal"] = trans["ai"]["patches_heal"]
-
+    deep_merge(data, trans)
     sorted_data = sort_dict_recursively(data)
 
     with open(file_path, "w", encoding="utf-8") as f:
@@ -199,7 +277,7 @@ def main():
         print(f"Error: Locales directory '{LOCALES_DIR}' does not exist.")
         return
 
-    print("Starting sorted translation updates...")
+    print("Starting lens blur translation updates...")
     for lang, trans in TRANSLATIONS.items():
         file_path = LOCALES_DIR / f"{lang}.json"
         update_json_file(file_path, trans)
